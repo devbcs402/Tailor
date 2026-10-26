@@ -4,6 +4,7 @@ import { ShirtMeasurements } from './ShirtMeasurements';
 import { PantMeasurements } from './PantMeasurements';
 import { ordersApi } from '../../api/ordersApi';
 import { useToast } from '../../context/ToastContext';
+import { REQUIRED_SHIRT_FIELDS, REQUIRED_PANT_FIELDS } from '../../utils/measurementLabels';
 
 export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
   const { success, error: toastError } = useToast();
@@ -16,11 +17,13 @@ export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
   const [shirtPatterns, setShirtPatterns] = useState([]);
   const [shirtCustomPattern, setShirtCustomPattern] = useState('');
   const [shirtMeasurements, setShirtMeasurements] = useState({});
+  const [shirtErrors, setShirtErrors] = useState({});
 
   const [pantQuantity, setPantQuantity] = useState(0);
   const [pantPatterns, setPantPatterns] = useState([]);
   const [pantCustomPattern, setPantCustomPattern] = useState('');
   const [pantMeasurements, setPantMeasurements] = useState({});
+  const [pantErrors, setPantErrors] = useState({});
 
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState('');
@@ -75,29 +78,57 @@ export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
       return;
     }
 
-    // Numeric measurement validations
+    // Quantity-based measurement validations
+    const newShirtErrors = {};
+    const newPantErrors = {};
+
     if (sQty > 0) {
+      for (const field of REQUIRED_SHIRT_FIELDS) {
+        const val = shirtMeasurements[field];
+        if (val === undefined || val === null || String(val).trim() === '') {
+          newShirtErrors[field] = 'Required';
+        }
+      }
       for (const [key, val] of Object.entries(shirtMeasurements)) {
-        if (key !== 'notes' && val) {
+        if (key !== 'notes' && val !== undefined && val !== null && String(val).trim() !== '') {
           const num = parseFloat(val);
           if (isNaN(num) || num <= 0) {
-            setValidationError(`Shirt measurement for "${key}" must be a valid positive number.`);
-            return;
+            newShirtErrors[key] = 'Must be > 0';
           }
         }
       }
     }
 
     if (pQty > 0) {
+      for (const field of REQUIRED_PANT_FIELDS) {
+        const val = pantMeasurements[field];
+        if (val === undefined || val === null || String(val).trim() === '') {
+          newPantErrors[field] = 'Required';
+        }
+      }
       for (const [key, val] of Object.entries(pantMeasurements)) {
-        if (key !== 'notes' && val) {
+        if (key !== 'notes' && val !== undefined && val !== null && String(val).trim() !== '') {
           const num = parseFloat(val);
           if (isNaN(num) || num <= 0) {
-            setValidationError(`Pant measurement for "${key}" must be a valid positive number.`);
-            return;
+            newPantErrors[key] = 'Must be > 0';
           }
         }
       }
+    }
+
+    setShirtErrors(newShirtErrors);
+    setPantErrors(newPantErrors);
+
+    if (Object.keys(newShirtErrors).length > 0 || Object.keys(newPantErrors).length > 0) {
+      const messages = [];
+      if (Object.keys(newShirtErrors).length > 0) {
+        messages.push(`Required shirt measurements missing (${Object.keys(newShirtErrors).join(', ')})`);
+      }
+      if (Object.keys(newPantErrors).length > 0) {
+        messages.push(`Required pant measurements missing (${Object.keys(newPantErrors).join(', ')})`);
+      }
+      setValidationError(messages.join('. '));
+      return;
     }
 
     setSubmitting(true);
@@ -230,7 +261,13 @@ export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
             customPattern={shirtCustomPattern}
             onChangeCustomPattern={setShirtCustomPattern}
             quantity={shirtQuantity}
-            onChangeQuantity={setShirtQuantity}
+            onChangeQuantity={(val) => {
+              setShirtQuantity(val);
+              const p = parseInt(val, 10);
+              if (isNaN(p) || p <= 0) setShirtErrors({});
+            }}
+            errors={shirtErrors}
+            onClearError={(key) => setShirtErrors((prev) => { const n = { ...prev }; delete n[key]; return n; })}
           />
 
           {/* Pant Measurements Section with dynamic pattern checkboxes */}
@@ -242,7 +279,13 @@ export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
             customPattern={pantCustomPattern}
             onChangeCustomPattern={setPantCustomPattern}
             quantity={pantQuantity}
-            onChangeQuantity={setPantQuantity}
+            onChangeQuantity={(val) => {
+              setPantQuantity(val);
+              const p = parseInt(val, 10);
+              if (isNaN(p) || p <= 0) setPantErrors({});
+            }}
+            errors={pantErrors}
+            onClearError={(key) => setPantErrors((prev) => { const n = { ...prev }; delete n[key]; return n; })}
           />
 
           {/* Schedule & Notes */}

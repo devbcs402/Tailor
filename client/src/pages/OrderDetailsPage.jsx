@@ -9,6 +9,7 @@ import {
   MapPin,
   FileText,
   Edit,
+  Trash2,
 } from 'lucide-react';
 import { ordersApi } from '../api/ordersApi';
 import { Loading } from '../components/common/Loading';
@@ -20,10 +21,13 @@ import { getShirtPatternLabel, getPantPatternLabel } from '../utils/patternOptio
 import { StatusChangeModal } from '../components/orders/StatusChangeModal';
 import { OrderPrintSlip } from '../components/orders/OrderPrintSlip';
 import { EditOrderModal } from '../components/orders/EditOrderModal';
+import { ConfirmDialog } from '../components/common/ConfirmDialog';
+import { useToast } from '../context/ToastContext';
 
 export const OrderDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { success, error: toastError } = useToast();
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -32,6 +36,8 @@ export const OrderDetailsPage = () => {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchOrder = async () => {
     setLoading(true);
@@ -67,6 +73,20 @@ export const OrderDetailsPage = () => {
     order.pant?.customPattern
   ].filter(Boolean).join(', ') || 'None';
 
+  const handleDeleteOrder = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await ordersApi.deleteOrder(order._id);
+      success(`Order #${order.orderNumber} deleted successfully`);
+      navigate('/orders');
+    } catch (err) {
+      toastError(err.message || 'Failed to delete order');
+      setDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  };
+
   return (
     <div style={{ maxWidth: '1080px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Top Action Bar */}
@@ -79,7 +99,7 @@ export const OrderDetailsPage = () => {
           <ArrowLeft size={16} /> Back to Orders
         </button>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button
             onClick={() => setShowEditModal(true)}
             className="btn btn-outline btn-sm"
@@ -98,6 +118,14 @@ export const OrderDetailsPage = () => {
             className="btn btn-primary btn-sm"
           >
             <Printer size={16} /> Print Slip
+          </button>
+          <button
+            onClick={() => setShowDeleteDialog(true)}
+            className="btn btn-outline btn-sm"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#dc2626', borderColor: '#fca5a5' }}
+            title="Delete Order"
+          >
+            <Trash2 size={16} /> Delete Order
           </button>
         </div>
       </div>
@@ -317,6 +345,19 @@ export const OrderDetailsPage = () => {
           onClose={() => setShowPrintModal(false)}
         />
       )}
+
+      {/* Delete Order Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteDialog}
+        onClose={() => !deleting && setShowDeleteDialog(false)}
+        onConfirm={handleDeleteOrder}
+        title="Delete Order"
+        message={`Are you sure you want to delete order #${order?.orderNumber}? This action cannot be undone.`}
+        confirmText="Delete Order"
+        cancelText="Cancel"
+        danger={true}
+        loading={deleting}
+      />
     </div>
   );
 };

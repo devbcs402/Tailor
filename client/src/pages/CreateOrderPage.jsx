@@ -14,6 +14,7 @@ import { PantMeasurements } from '../components/orders/PantMeasurements';
 import { ordersApi } from '../api/ordersApi';
 import { useToast } from '../context/ToastContext';
 import { OrderPrintSlip } from '../components/orders/OrderPrintSlip';
+import { REQUIRED_SHIRT_FIELDS, REQUIRED_PANT_FIELDS } from '../utils/measurementLabels';
 
 export const CreateOrderPage = () => {
   const navigate = useNavigate();
@@ -42,12 +43,14 @@ export const CreateOrderPage = () => {
   const [shirtPatterns, setShirtPatterns] = useState([]);
   const [shirtCustomPattern, setShirtCustomPattern] = useState('');
   const [shirtQuantity, setShirtQuantity] = useState(1);
+  const [shirtErrors, setShirtErrors] = useState({});
 
   // Pant State
   const [pantMeasurements, setPantMeasurements] = useState({});
   const [pantPatterns, setPantPatterns] = useState([]);
   const [pantCustomPattern, setPantCustomPattern] = useState('');
   const [pantQuantity, setPantQuantity] = useState(1);
+  const [pantErrors, setPantErrors] = useState({});
 
   // Order Details State
   const todayStr = new Date().toISOString().split('T')[0];
@@ -70,35 +73,110 @@ export const CreateOrderPage = () => {
     }
   }, [location.state]);
 
-  // When an existing customer is selected, pre-fill measurements ONLY if Qty is > 0
+  // When an existing customer is selected, pre-fill measurements independently
   const handleSelectCustomer = (customer) => {
     setSelectedCustomer(customer);
-    if (customer.latestMeasurements) {
-      const latest = customer.latestMeasurements;
-      const sQty = parseInt(shirtQuantity, 10);
-      if (!isNaN(sQty) && sQty > 0) {
-        setShirtMeasurements(latest.shirt ? { ...latest.shirt } : {});
-        const sPatterns = Array.isArray(latest.shirtPatterns) && latest.shirtPatterns.length > 0
-          ? latest.shirtPatterns
-          : (latest.shirtPattern ? [latest.shirtPattern] : []);
-        setShirtPatterns(sPatterns);
-        setShirtCustomPattern(latest.shirtCustomPattern || '');
-      } else {
-        setShirtMeasurements({});
-      }
+    setShirtErrors({});
+    setPantErrors({});
+    setValidationError('');
 
-      const pQty = parseInt(pantQuantity, 10);
-      if (!isNaN(pQty) && pQty > 0) {
-        setPantMeasurements(latest.pant ? { ...latest.pant } : {});
-        const pPatterns = Array.isArray(latest.pantPatterns) && latest.pantPatterns.length > 0
-          ? latest.pantPatterns
-          : (latest.pantPattern ? [latest.pantPattern] : []);
-        setPantPatterns(pPatterns);
-        setPantCustomPattern(latest.pantCustomPattern || '');
-      } else {
-        setPantMeasurements({});
+    const lm = customer?.latestMeasurements || {};
+
+    const sQty = parseInt(shirtQuantity, 10);
+    if (!isNaN(sQty) && sQty > 0) {
+      // If customer has saved shirt measurements, load them; otherwise initialize empty editable object
+      setShirtMeasurements(lm.shirt ? { ...lm.shirt } : {});
+      const sPatterns = Array.isArray(lm.shirtPatterns) && lm.shirtPatterns.length > 0
+        ? lm.shirtPatterns
+        : (lm.shirtPattern ? [lm.shirtPattern] : []);
+      setShirtPatterns(sPatterns);
+      setShirtCustomPattern(lm.shirtCustomPattern || '');
+    } else {
+      setShirtMeasurements({});
+    }
+
+    const pQty = parseInt(pantQuantity, 10);
+    if (!isNaN(pQty) && pQty > 0) {
+      // If customer has saved pant measurements, load them; otherwise initialize empty editable object
+      setPantMeasurements(lm.pant ? { ...lm.pant } : {});
+      const pPatterns = Array.isArray(lm.pantPatterns) && lm.pantPatterns.length > 0
+        ? lm.pantPatterns
+        : (lm.pantPattern ? [lm.pantPattern] : []);
+      setPantPatterns(pPatterns);
+      setPantCustomPattern(lm.pantCustomPattern || '');
+    } else {
+      setPantMeasurements({});
+    }
+  };
+
+  // When shirt quantity changes
+  const handleShirtQuantityChange = (val) => {
+    setShirtQuantity(val);
+    const parsed = parseInt(val, 10);
+    if (isNaN(parsed) || parsed <= 0) {
+      setShirtMeasurements({});
+      setShirtErrors({});
+    } else {
+      // If user increases quantity from 0 to positive, prefill from customer's profile if available
+      const currentHasValues = Object.values(shirtMeasurements).some((v) => v && String(v).trim().length > 0);
+      if (!currentHasValues && selectedCustomer?.latestMeasurements?.shirt) {
+        const saved = selectedCustomer.latestMeasurements.shirt;
+        const savedHasValues = Object.values(saved).some((v) => v && String(v).trim().length > 0);
+        if (savedHasValues) {
+          setShirtMeasurements({ ...saved });
+          const sPatterns = Array.isArray(selectedCustomer.latestMeasurements.shirtPatterns) && selectedCustomer.latestMeasurements.shirtPatterns.length > 0
+            ? selectedCustomer.latestMeasurements.shirtPatterns
+            : (selectedCustomer.latestMeasurements.shirtPattern ? [selectedCustomer.latestMeasurements.shirtPattern] : []);
+          if (sPatterns.length > 0) setShirtPatterns(sPatterns);
+          if (selectedCustomer.latestMeasurements.shirtCustomPattern) {
+            setShirtCustomPattern(selectedCustomer.latestMeasurements.shirtCustomPattern);
+          }
+        }
       }
     }
+  };
+
+  // When pant quantity changes
+  const handlePantQuantityChange = (val) => {
+    setPantQuantity(val);
+    const parsed = parseInt(val, 10);
+    if (isNaN(parsed) || parsed <= 0) {
+      setPantMeasurements({});
+      setPantErrors({});
+    } else {
+      // If user increases quantity from 0 to positive, prefill from customer's profile if available
+      const currentHasValues = Object.values(pantMeasurements).some((v) => v && String(v).trim().length > 0);
+      if (!currentHasValues && selectedCustomer?.latestMeasurements?.pant) {
+        const saved = selectedCustomer.latestMeasurements.pant;
+        const savedHasValues = Object.values(saved).some((v) => v && String(v).trim().length > 0);
+        if (savedHasValues) {
+          setPantMeasurements({ ...saved });
+          const pPatterns = Array.isArray(selectedCustomer.latestMeasurements.pantPatterns) && selectedCustomer.latestMeasurements.pantPatterns.length > 0
+            ? selectedCustomer.latestMeasurements.pantPatterns
+            : (selectedCustomer.latestMeasurements.pantPattern ? [selectedCustomer.latestMeasurements.pantPattern] : []);
+          if (pPatterns.length > 0) setPantPatterns(pPatterns);
+          if (selectedCustomer.latestMeasurements.pantCustomPattern) {
+            setPantCustomPattern(selectedCustomer.latestMeasurements.pantCustomPattern);
+          }
+        }
+      }
+    }
+  };
+
+  const handleClearShirtError = (key) => {
+    setShirtErrors((prev) => {
+      const copy = { ...prev };
+      delete copy[key];
+      return copy;
+    });
+  };
+
+  const handleClearPantError = (key) => {
+    setPantErrors((prev) => {
+      const copy = { ...prev };
+      delete copy[key];
+      return copy;
+    });
   };
 
   const handleClearCustomer = () => {
@@ -106,9 +184,11 @@ export const CreateOrderPage = () => {
     setShirtMeasurements({});
     setShirtPatterns([]);
     setShirtCustomPattern('');
+    setShirtErrors({});
     setPantMeasurements({});
     setPantPatterns([]);
     setPantCustomPattern('');
+    setPantErrors({});
   };
 
   const handleSubmit = async (e) => {
@@ -161,29 +241,57 @@ export const CreateOrderPage = () => {
       return;
     }
 
-    // 4. Numeric Measurement Validations for positive garment quantities
+    // 4. Quantity-based Measurement Validations
+    const newShirtErrors = {};
+    const newPantErrors = {};
+
     if (sQty > 0) {
+      for (const field of REQUIRED_SHIRT_FIELDS) {
+        const val = shirtMeasurements[field];
+        if (val === undefined || val === null || String(val).trim() === '') {
+          newShirtErrors[field] = 'Required';
+        }
+      }
       for (const [key, val] of Object.entries(shirtMeasurements)) {
-        if (key !== 'notes' && val) {
+        if (key !== 'notes' && val !== undefined && val !== null && String(val).trim() !== '') {
           const num = parseFloat(val);
           if (isNaN(num) || num <= 0) {
-            setValidationError(`Shirt measurement for "${key}" must be a valid positive number.`);
-            return;
+            newShirtErrors[key] = 'Must be > 0';
           }
         }
       }
     }
 
     if (pQty > 0) {
+      for (const field of REQUIRED_PANT_FIELDS) {
+        const val = pantMeasurements[field];
+        if (val === undefined || val === null || String(val).trim() === '') {
+          newPantErrors[field] = 'Required';
+        }
+      }
       for (const [key, val] of Object.entries(pantMeasurements)) {
-        if (key !== 'notes' && val) {
+        if (key !== 'notes' && val !== undefined && val !== null && String(val).trim() !== '') {
           const num = parseFloat(val);
           if (isNaN(num) || num <= 0) {
-            setValidationError(`Pant measurement for "${key}" must be a valid positive number.`);
-            return;
+            newPantErrors[key] = 'Must be > 0';
           }
         }
       }
+    }
+
+    setShirtErrors(newShirtErrors);
+    setPantErrors(newPantErrors);
+
+    if (Object.keys(newShirtErrors).length > 0 || Object.keys(newPantErrors).length > 0) {
+      const messages = [];
+      if (Object.keys(newShirtErrors).length > 0) {
+        messages.push(`Please provide all required shirt measurements (${Object.keys(newShirtErrors).join(', ')})`);
+      }
+      if (Object.keys(newPantErrors).length > 0) {
+        messages.push(`Please provide all required pant measurements (${Object.keys(newPantErrors).join(', ')})`);
+      }
+      setValidationError(messages.join('. '));
+      return;
     }
 
     setSubmitting(true);
@@ -444,7 +552,9 @@ export const CreateOrderPage = () => {
           customPattern={shirtCustomPattern}
           onChangeCustomPattern={setShirtCustomPattern}
           quantity={shirtQuantity}
-          onChangeQuantity={setShirtQuantity}
+          onChangeQuantity={handleShirtQuantityChange}
+          errors={shirtErrors}
+          onClearError={handleClearShirtError}
         />
 
         {/* Section 3: Pant Measurements */}
@@ -456,7 +566,9 @@ export const CreateOrderPage = () => {
           customPattern={pantCustomPattern}
           onChangeCustomPattern={setPantCustomPattern}
           quantity={pantQuantity}
-          onChangeQuantity={setPantQuantity}
+          onChangeQuantity={handlePantQuantityChange}
+          errors={pantErrors}
+          onClearError={handleClearPantError}
         />
 
         {/* Section 4: Order Schedule & Instructions */}

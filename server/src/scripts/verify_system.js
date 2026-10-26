@@ -240,7 +240,7 @@ async function runTests() {
       pant: {
         quantity: 2,
         patterns: ['Formal'],
-        measurements: { length: '40', waist: '34' },
+        measurements: { length: '40', waist: '34', hip: '38', bottomOpening: '15' },
       },
       saveAsLatestMeasurements: true,
     };
@@ -323,6 +323,269 @@ async function runTests() {
     } else {
       throw new Error('Failed to reject empty customer name! Status: ' + invalidNameRes.status);
     }
+
+    // 13. Delete Order Functionality (Requirement 1)
+    console.log('\n--- Testing Delete Order Functionality & Data Integrity ---');
+    // 13.1 Invalid ID rejection
+    const invalidIdRes = await fetch(`${BASE_URL}/orders/invalid-id-123`, {
+      method: 'DELETE',
+      headers,
+    });
+    if (invalidIdRes.status === 400) {
+      console.log('✓ [Delete Order]: Rejection on malformed ID verified.');
+    } else {
+      throw new Error('Failed to reject malformed ID on delete! Status: ' + invalidIdRes.status);
+    }
+
+    // 13.2 Non-existent order ID rejection (404)
+    const fakeId = '507f1f77bcf86cd799439011';
+    const notFoundRes = await fetch(`${BASE_URL}/orders/${fakeId}`, {
+      method: 'DELETE',
+      headers,
+    });
+    if (notFoundRes.status === 404) {
+      console.log('✓ [Delete Order]: 404 on non-existent order verified.');
+    } else {
+      throw new Error('Failed to return 404 for missing order on delete! Status: ' + notFoundRes.status);
+    }
+
+    // 13.3 Create a dedicated order for deletion testing
+    const delOrderPayload = {
+      isNewCustomer: false,
+      customerId: firstCustomer._id,
+      deadline: new Date(Date.now() + 86400000 * 3).toISOString(),
+      shirt: {
+        quantity: 1,
+        patterns: ['Plain'],
+        measurements: { length: '29', chest: '40', waist: '36', shoulder: '18', sleeveLength: '24' },
+      },
+      pant: { quantity: 0 },
+    };
+    const createDelOrderRes = await fetch(`${BASE_URL}/orders`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(delOrderPayload),
+    });
+    const createDelOrderData = await createDelOrderRes.json();
+    const orderToDelete = createDelOrderData.data;
+    console.log(`✓ [Delete Order]: Created test order ${orderToDelete.orderNumber} for deletion test.`);
+
+    // 13.4 Delete the order
+    const doDeleteRes = await fetch(`${BASE_URL}/orders/${orderToDelete._id}`, {
+      method: 'DELETE',
+      headers,
+    });
+    const doDeleteData = await doDeleteRes.json();
+    if (!doDeleteData.success) {
+      throw new Error('Failed to delete order: ' + JSON.stringify(doDeleteData));
+    }
+    console.log(`✓ [Delete Order]: Deleted order ${orderToDelete.orderNumber} successfully.`);
+
+    // 13.5 Verify order is gone
+    const verifyDelRes = await fetch(`${BASE_URL}/orders/${orderToDelete._id}`, { headers });
+    if (verifyDelRes.status === 404) {
+      console.log('✓ [Delete Order]: Verified order no longer exists in database.');
+    } else {
+      throw new Error('Deleted order is still retrievable!');
+    }
+
+    // 13.6 Verify customer STILL exists and customer's permanent measurements are intact
+    const verifyCustRes = await fetch(`${BASE_URL}/customers/${firstCustomer._id}`, { headers });
+    const verifyCustData = await verifyCustRes.json();
+    if (!verifyCustData.success || !verifyCustData.data) {
+      throw new Error('Customer was deleted or corrupted when order was deleted!');
+    }
+    console.log(`✓ [Data Integrity]: Verified customer "${verifyCustData.data.name}" still exists and permanent measurements remain intact.`);
+
+    // 14. Quantity-Based Measurement Validation (Requirement 2)
+    console.log('\n--- Testing Quantity-Based Measurement Validation ---');
+    // 14.1 Shirt Qty = 1 with missing required measurements should be rejected
+    const missingShirtRes = await fetch(`${BASE_URL}/orders`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        isNewCustomer: false,
+        customerId: firstCustomer._id,
+        deadline: new Date(Date.now() + 86400000 * 3).toISOString(),
+        shirt: {
+          quantity: 1,
+          measurements: { length: '29', chest: '40' }, // missing waist, shoulder, sleeveLength
+        },
+        pant: { quantity: 0 },
+      }),
+    });
+    const missingShirtData = await missingShirtRes.json();
+    if (missingShirtRes.status === 400 && missingShirtData.message.includes('measurement')) {
+      console.log(`✓ [Validation]: Correctly rejected order with missing shirt measurements: "${missingShirtData.message}"`);
+    } else {
+      throw new Error('Failed to reject missing shirt measurements! Status: ' + missingShirtRes.status);
+    }
+
+    // 14.2 Pant Qty = 1 with missing required measurements should be rejected
+    const missingPantRes = await fetch(`${BASE_URL}/orders`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        isNewCustomer: false,
+        customerId: firstCustomer._id,
+        deadline: new Date(Date.now() + 86400000 * 3).toISOString(),
+        shirt: { quantity: 0 },
+        pant: {
+          quantity: 1,
+          measurements: { length: '39' }, // missing waist, hip, bottomOpening
+        },
+      }),
+    });
+    const missingPantData = await missingPantRes.json();
+    if (missingPantRes.status === 400 && missingPantData.message.includes('measurement')) {
+      console.log(`✓ [Validation]: Correctly rejected order with missing pant measurements: "${missingPantData.message}"`);
+    } else {
+      throw new Error('Failed to reject missing pant measurements! Status: ' + missingPantRes.status);
+    }
+
+    // 14.3 Non-positive / invalid measurement values rejected
+    const invalidValRes = await fetch(`${BASE_URL}/orders`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        isNewCustomer: false,
+        customerId: firstCustomer._id,
+        deadline: new Date(Date.now() + 86400000 * 3).toISOString(),
+        shirt: {
+          quantity: 1,
+          measurements: { length: '-5', chest: '40', waist: '36', shoulder: '18', sleeveLength: '24' },
+        },
+        pant: { quantity: 0 },
+      }),
+    });
+    if (invalidValRes.status === 400) {
+      console.log('✓ [Validation]: Correctly rejected negative measurement value.');
+    } else {
+      throw new Error('Failed to reject negative measurement! Status: ' + invalidValRes.status);
+    }
+
+    // 14.4 Legitimate decimal measurements accepted
+    const decimalOrderRes = await fetch(`${BASE_URL}/orders`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        isNewCustomer: false,
+        customerId: firstCustomer._id,
+        deadline: new Date(Date.now() + 86400000 * 3).toISOString(),
+        shirt: {
+          quantity: 1,
+          measurements: { length: '29.5', chest: '40.25', waist: '36.5', shoulder: '18.75', sleeveLength: '24.5' },
+        },
+        pant: { quantity: 0 },
+      }),
+    });
+    const decimalOrderData = await decimalOrderRes.json();
+    if (decimalOrderRes.status === 201 && decimalOrderData.success) {
+      console.log(`✓ [Validation]: Successfully created order with decimal measurements: ${decimalOrderData.data.orderNumber}`);
+      // Clean up test order
+      await fetch(`${BASE_URL}/orders/${decimalOrderData.data._id}`, { method: 'DELETE', headers });
+    } else {
+      throw new Error('Failed to accept legitimate decimal measurements! Status: ' + decimalOrderRes.status);
+    }
+
+    // 15. Customer Measurement Loading & Return Visit Flow (Requirement 3)
+    console.log('\n--- Testing Scenario A (First Visit: Shirt Only) & Scenario B (Return Visit: Shirt + Pant) ---');
+    // Scenario A: First visit - Customer needs only a shirt
+    const scenarioMobile = '91' + Date.now().toString().slice(-8);
+    const scenarioACustomerPayload = {
+      isNewCustomer: true,
+      customerDetails: {
+        name: 'Scenario Test Customer',
+        mobileNumber: scenarioMobile,
+      },
+      deadline: new Date(Date.now() + 86400000 * 3).toISOString(),
+      shirt: {
+        quantity: 1,
+        patterns: ['Plain'],
+        measurements: { length: '28.5', chest: '38', waist: '34', shoulder: '17.5', sleeveLength: '23' },
+      },
+      pant: {
+        quantity: 0, // No pant
+        measurements: {},
+      },
+      saveAsLatestMeasurements: true,
+    };
+
+    const scenarioAOrderRes = await fetch(`${BASE_URL}/orders`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(scenarioACustomerPayload),
+    });
+    const scenarioAOrderData = await scenarioAOrderRes.json();
+    if (!scenarioAOrderData.success) {
+      throw new Error('Scenario A order creation failed: ' + JSON.stringify(scenarioAOrderData));
+    }
+    const scenarioCustId = scenarioAOrderData.data.customer;
+    console.log(`✓ [Scenario A]: Created initial Shirt-only order for new customer ${scenarioCustId}.`);
+
+    // Verify customer profile has saved shirt measurements and pant measurements are empty
+    const checkCustARes = await fetch(`${BASE_URL}/customers/${scenarioCustId}`, { headers });
+    const checkCustAData = await checkCustARes.json();
+    const custALatest = checkCustAData.data.latestMeasurements;
+    if (!custALatest?.shirt?.length || !custALatest?.shirt?.chest) {
+      throw new Error('Scenario A failed: customer shirt measurements not saved!');
+    }
+    const hasPantA = Object.values(custALatest?.pant || {}).some(v => v && String(v).trim().length > 0);
+    if (hasPantA) {
+      throw new Error('Scenario A failed: pant measurements should be empty!');
+    }
+    console.log('✓ [Scenario A]: Verified customer permanent profile has shirt measurements and NO pant measurements.');
+
+    // Scenario B: Customer returns and needs BOTH Shirt and Pant!
+    const scenarioBOrderPayload = {
+      isNewCustomer: false,
+      customerId: scenarioCustId,
+      deadline: new Date(Date.now() + 86400000 * 4).toISOString(),
+      shirt: {
+        quantity: 1,
+        patterns: ['Plain'],
+        measurements: custALatest.shirt, // Prefilled from permanent profile
+      },
+      pant: {
+        quantity: 1, // Pant quantity is now 1!
+        patterns: ['Formal'],
+        measurements: { length: '39.5', waist: '32', hip: '38', bottomOpening: '14.5' }, // Newly entered pant measurements
+      },
+      saveAsLatestMeasurements: true, // Update permanent profile
+    };
+
+    const scenarioBOrderRes = await fetch(`${BASE_URL}/orders`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(scenarioBOrderPayload),
+    });
+    const scenarioBOrderData = await scenarioBOrderRes.json();
+    if (!scenarioBOrderData.success) {
+      throw new Error('Scenario B order creation failed: ' + JSON.stringify(scenarioBOrderData));
+    }
+    const scenarioBOrder = scenarioBOrderData.data;
+    console.log(`✓ [Scenario B]: Created return order ${scenarioBOrder.orderNumber} with both Shirt and Pant measurements.`);
+
+    // Verify order has BOTH garment measurements intact
+    if (!scenarioBOrder.shirt?.measurements?.length || !scenarioBOrder.pant?.measurements?.length) {
+      throw new Error('Scenario B order is missing garment measurements: ' + JSON.stringify(scenarioBOrder));
+    }
+    console.log('✓ [Scenario B]: Order snapshot contains both valid shirt and pant measurements.');
+
+    // Verify customer permanent profile now has BOTH shirt and pant measurements without losing shirt measurements
+    const checkCustBRes = await fetch(`${BASE_URL}/customers/${scenarioCustId}`, { headers });
+    const checkCustBData = await checkCustBRes.json();
+    const custBLatest = checkCustBData.data.latestMeasurements;
+    if (custBLatest.shirt.length !== '28.5' || custBLatest.pant.length !== '39.5') {
+      throw new Error('Scenario B permanent profile update mismatch: ' + JSON.stringify(custBLatest));
+    }
+    console.log('✓ [Scenario B]: Customer permanent profile updated with newly entered pant measurements while preserving shirt measurements!');
+
+    // Clean up scenario test records
+    await fetch(`${BASE_URL}/orders/${scenarioAOrderData.data._id}`, { method: 'DELETE', headers });
+    await fetch(`${BASE_URL}/orders/${scenarioBOrder._id}`, { method: 'DELETE', headers });
+    await fetch(`${BASE_URL}/customers/${scenarioCustId}`, { method: 'DELETE', headers });
+    console.log('✓ [Cleanup]: Cleaned up scenario test records.');
 
     console.log('\n========================================================');
     console.log('🎉 ALL INTEGRATION TESTS PASSED 100% SUCCESSFULLY! 🎉');

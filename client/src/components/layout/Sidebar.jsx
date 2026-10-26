@@ -17,6 +17,18 @@ export const Sidebar = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Prevent background content from scrolling when mobile drawer is open
+  React.useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   const handleLogout = async () => {
     await logout();
     navigate('/login');
@@ -56,12 +68,14 @@ export const Sidebar = ({ isOpen, onClose }) => {
           color: 'var(--text-on-dark)',
           display: 'flex',
           flexDirection: 'column',
-          position: 'sticky',
+          position: 'fixed',
+          left: 0,
           top: 0,
+          bottom: 0,
           height: '100vh',
-          zIndex: 50,
-          overflowY: 'auto',
-          overflowX: 'hidden',
+          maxHeight: '100vh',
+          zIndex: 100,
+          overflow: 'hidden',
           transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           boxShadow: '4px 0 20px rgba(0, 0, 0, 0.1)',
         }}
@@ -75,6 +89,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
             alignItems: 'center',
             justifyContent: 'space-between',
             borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            flexShrink: 0,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -119,7 +134,17 @@ export const Sidebar = ({ isOpen, onClose }) => {
         </div>
 
         {/* Navigation Links */}
-        <nav style={{ flex: 1, padding: '20px 14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <nav
+          style={{
+            flex: 1,
+            padding: '20px 14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            overflowY: 'auto',
+            overflowX: 'hidden',
+          }}
+        >
           <div
             style={{
               fontSize: '0.72rem',
@@ -177,6 +202,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
             padding: '18px 16px',
             borderTop: '1px solid rgba(255, 255, 255, 0.08)',
             backgroundColor: 'rgba(0, 0, 0, 0.2)',
+            flexShrink: 0,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>

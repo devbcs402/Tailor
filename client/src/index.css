@@ -103,6 +103,7 @@ h1, h2, h3, h4, h5, h6 {
 .app-container {
   display: flex;
   min-height: 100vh;
+  width: 100%;
 }
 
 .main-content {
@@ -111,6 +112,15 @@ h1, h2, h3, h4, h5, h6 {
   flex-direction: column;
   min-width: 0;
   background-color: var(--bg-app);
+  margin-left: var(--sidebar-width);
+  width: calc(100% - var(--sidebar-width));
+}
+
+@media (max-width: 900px) {
+  .main-content {
+    margin-left: 0;
+    width: 100%;
+  }
 }
 
 .page-body {
@@ -487,12 +497,7 @@ html, body {
   max-width: 100vw;
 }
 
-.app-container {
-  display: flex;
-  min-height: 100vh;
-  width: 100%;
-  overflow-x: hidden;
-}
+
 
 button, input, select, textarea {
   touch-action: manipulation;

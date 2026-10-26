@@ -38,10 +38,10 @@ export const CustomerDetailsPage = () => {
 
   // Edit measurements state
   const [editShirt, setEditShirt] = useState({});
-  const [editShirtPattern, setEditShirtPattern] = useState('');
+  const [editShirtPatterns, setEditShirtPatterns] = useState([]);
   const [editShirtCustomPattern, setEditShirtCustomPattern] = useState('');
   const [editPant, setEditPant] = useState({});
-  const [editPantPattern, setEditPantPattern] = useState('');
+  const [editPantPatterns, setEditPantPatterns] = useState([]);
   const [editPantCustomPattern, setEditPantCustomPattern] = useState('');
   const [savingMeasurements, setSavingMeasurements] = useState(false);
 
@@ -56,14 +56,21 @@ export const CustomerDetailsPage = () => {
       setCustomer(custRes.data);
       setOrders(ordersRes.data || []);
 
-      // Prepare edit measurement states
+      // Prepare edit measurement states safely
       if (custRes.data.latestMeasurements) {
         const lm = custRes.data.latestMeasurements;
         setEditShirt(lm.shirt ? { ...lm.shirt } : {});
-        setEditShirtPattern(lm.shirtPattern || lm.shirtCustomPattern || '');
+        const sPatterns = Array.isArray(lm.shirtPatterns) && lm.shirtPatterns.length > 0
+          ? lm.shirtPatterns
+          : (lm.shirtPattern ? [lm.shirtPattern] : []);
+        setEditShirtPatterns(sPatterns);
         setEditShirtCustomPattern(lm.shirtCustomPattern || '');
+
         setEditPant(lm.pant ? { ...lm.pant } : {});
-        setEditPantPattern(lm.pantPattern || lm.pantCustomPattern || '');
+        const pPatterns = Array.isArray(lm.pantPatterns) && lm.pantPatterns.length > 0
+          ? lm.pantPatterns
+          : (lm.pantPattern ? [lm.pantPattern] : []);
+        setEditPantPatterns(pPatterns);
         setEditPantCustomPattern(lm.pantCustomPattern || '');
       }
     } catch (err) {
@@ -84,10 +91,12 @@ export const CustomerDetailsPage = () => {
       const updatedMeasurements = {
         unit: customer.latestMeasurements?.unit || 'inch',
         shirt: editShirt,
-        shirtPattern: editShirtPattern,
+        shirtPatterns: editShirtPatterns,
+        shirtPattern: editShirtPatterns.join(', '),
         shirtCustomPattern: editShirtCustomPattern,
         pant: editPant,
-        pantPattern: editPantPattern,
+        pantPatterns: editPantPatterns,
+        pantPattern: editPantPatterns.join(', '),
         pantCustomPattern: editPantCustomPattern,
         updatedAt: new Date(),
       };
@@ -228,8 +237,10 @@ export const CustomerDetailsPage = () => {
             <ShirtMeasurements
               measurements={editShirt}
               onChangeMeasurements={setEditShirt}
-              pattern={editShirtPattern}
-              onChangePattern={setEditShirtPattern}
+              selectedPatterns={editShirtPatterns}
+              onChangeSelectedPatterns={setEditShirtPatterns}
+              customPattern={editShirtCustomPattern}
+              onChangeCustomPattern={setEditShirtCustomPattern}
               quantity={1}
               onChangeQuantity={() => {}}
             />
@@ -237,8 +248,10 @@ export const CustomerDetailsPage = () => {
             <PantMeasurements
               measurements={editPant}
               onChangeMeasurements={setEditPant}
-              pattern={editPantPattern}
-              onChangePattern={setEditPantPattern}
+              selectedPatterns={editPantPatterns}
+              onChangeSelectedPatterns={setEditPantPatterns}
+              customPattern={editPantCustomPattern}
+              onChangeCustomPattern={setEditPantCustomPattern}
               quantity={1}
               onChangeQuantity={() => {}}
             />

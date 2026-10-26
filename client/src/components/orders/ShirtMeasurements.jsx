@@ -12,6 +12,8 @@ export const ShirtMeasurements = ({
   onChangeCustomPattern,
   quantity = 1,
   onChangeQuantity,
+  errors = {},
+  onClearError,
 }) => {
   const [availablePatterns, setAvailablePatterns] = useState([]);
   const [loadingPatterns, setLoadingPatterns] = useState(false);
@@ -72,6 +74,9 @@ export const ShirtMeasurements = ({
 
   const handleFieldChange = (key, value) => {
     if (!isAvailable) return;
+    if (onClearError) {
+      onClearError(key);
+    }
     if (key === 'notes') {
       onChangeMeasurements({
         ...measurements,
@@ -211,37 +216,49 @@ export const ShirtMeasurements = ({
           gap: '12px',
         }}
       >
-        {SHIRT_FIELDS.map((f) => (
-          <div
-            key={f.key}
-            className="measure-input-card"
-            style={{
-              backgroundColor: isAvailable ? '#ffffff' : '#f8fafc',
-              borderColor: isAvailable ? 'var(--border-light)' : '#e2e8f0',
-              opacity: isAvailable ? 1 : 0.7,
-            }}
-          >
-            <div className="measure-label">
-              <span style={{ color: isAvailable ? '#475569' : '#94a3b8' }}>{f.label}</span>
-            </div>
-            <input
-              type="text"
-              inputMode="decimal"
-              className="form-control"
-              placeholder={isAvailable ? f.placeholder : '—'}
-              value={isAvailable ? (measurements[f.key] || '') : ''}
-              onChange={(e) => handleFieldChange(f.key, e.target.value)}
-              disabled={!isAvailable}
+        {SHIRT_FIELDS.map((f) => {
+          const hasError = Boolean(errors && errors[f.key]);
+          return (
+            <div
+              key={f.key}
+              className="measure-input-card"
               style={{
-                fontWeight: 600,
-                fontSize: '1rem',
-                padding: '6px 10px',
-                backgroundColor: isAvailable ? '#ffffff' : '#f1f5f9',
-                cursor: isAvailable ? 'text' : 'not-allowed',
+                backgroundColor: isAvailable ? '#ffffff' : '#f8fafc',
+                borderColor: hasError ? '#dc2626' : (isAvailable ? 'var(--border-light)' : '#e2e8f0'),
+                borderWidth: hasError ? '1.5px' : '1px',
+                opacity: isAvailable ? 1 : 0.7,
               }}
-            />
-          </div>
-        ))}
+            >
+              <div className="measure-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: hasError ? '#dc2626' : (isAvailable ? '#475569' : '#94a3b8'), fontWeight: 600 }}>
+                  {f.label} {f.required && isAvailable && <span style={{ color: '#dc2626', fontWeight: 800 }}>*</span>}
+                </span>
+              </div>
+              <input
+                type="text"
+                inputMode="decimal"
+                className="form-control"
+                placeholder={isAvailable ? f.placeholder : '—'}
+                value={isAvailable ? (measurements[f.key] || '') : ''}
+                onChange={(e) => handleFieldChange(f.key, e.target.value)}
+                disabled={!isAvailable}
+                style={{
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  padding: '6px 10px',
+                  backgroundColor: isAvailable ? '#ffffff' : '#f1f5f9',
+                  borderColor: hasError ? '#dc2626' : undefined,
+                  cursor: isAvailable ? 'text' : 'not-allowed',
+                }}
+              />
+              {hasError && (
+                <span style={{ color: '#dc2626', fontSize: '0.73rem', marginTop: '4px', display: 'block', fontWeight: 600 }}>
+                  {errors[f.key]}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Shirt Special Notes */}

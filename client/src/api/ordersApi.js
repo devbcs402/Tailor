@@ -9,4 +9,5 @@ export const ordersApi = {
   createOrder: (orderData) => api.post('/orders', orderData),
   updateOrder: (id, orderData) => api.patch(`/orders/${id}`, orderData),
   updateStatus: (id, status) => api.patch(`/orders/${id}/status`, { status }),
+  deleteOrder: (id) => api.delete(`/orders/${id}`),
 };

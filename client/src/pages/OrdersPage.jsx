@@ -8,6 +8,7 @@ import {
   ArrowDown,
   Printer,
   RotateCcw,
+  Trash2,
 } from 'lucide-react';
 import { ordersApi } from '../api/ordersApi';
 import { Loading } from '../components/common/Loading';
@@ -18,6 +19,8 @@ import { SearchInput } from '../components/common/SearchInput';
 import { formatDate, getDeadlineStatus } from '../utils/dateUtils';
 import { StatusChangeModal } from '../components/orders/StatusChangeModal';
 import { OrderPrintSlip } from '../components/orders/OrderPrintSlip';
+import { ConfirmDialog } from '../components/common/ConfirmDialog';
+import { useToast } from '../context/ToastContext';
 
 export const OrdersPage = () => {
   const [orders, setOrders] = useState([]);
@@ -33,7 +36,10 @@ export const OrdersPage = () => {
 
   const [statusModalOrder, setStatusModalOrder] = useState(null);
   const [printSlipOrder, setPrintSlipOrder] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
+  const { success, error: toastError } = useToast();
   const navigate = useNavigate();
 
   const fetchOrders = async (page = 1, currentSize = pageSize) => {
@@ -78,6 +84,24 @@ export const OrdersPage = () => {
   const handlePageSizeChange = (newSize) => {
     setPageSize(newSize);
     fetchOrders(1, newSize);
+  };
+
+  const handleDeleteOrder = async () => {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    try {
+      await ordersApi.deleteOrder(deleteTarget._id);
+      success(`Order #${deleteTarget.orderNumber} deleted successfully`);
+      setDeleteTarget(null);
+      // If the deleted order was the last record on the current page, step back 1 page
+      const isLastOnPage = orders.length === 1 && pagination.page > 1;
+      const targetPage = isLastOnPage ? pagination.page - 1 : pagination.page;
+      fetchOrders(targetPage, pageSize);
+    } catch (err) {
+      toastError(err.message || 'Failed to delete order');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   // Toggle sort for column headers
@@ -392,6 +416,7 @@ export const OrdersPage = () => {
                               className="btn btn-outline btn-sm"
                               style={{ padding: '4px 8px' }}
                               title="View Order Details"
+                              aria-label={`View order ${o.orderNumber}`}
                             >
                               <Eye size={15} />
                             </button>
@@ -400,8 +425,18 @@ export const OrdersPage = () => {
                               className="btn btn-outline btn-sm"
                               style={{ padding: '4px 8px' }}
                               title="Print Slip"
+                              aria-label={`Print slip for order ${o.orderNumber}`}
                             >
                               <Printer size={15} />
+                            </button>
+                            <button
+                              onClick={() => setDeleteTarget(o)}
+                              className="btn btn-outline btn-sm"
+                              style={{ padding: '4px 8px', color: '#dc2626', borderColor: '#fca5a5' }}
+                              title="Delete Order"
+                              aria-label={`Delete order ${o.orderNumber}`}
+                            >
+                              <Trash2 size={15} />
                             </button>
                           </div>
                         </td>
@@ -443,6 +478,19 @@ export const OrdersPage = () => {
           onClose={() => setPrintSlipOrder(null)}
         />
       )}
+
+      {/* Delete Order Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => !deleting && setDeleteTarget(null)}
+        onConfirm={handleDeleteOrder}
+        title="Delete Order"
+        message={`Are you sure you want to delete order #${deleteTarget?.orderNumber}? This action cannot be undone.`}
+        confirmText="Delete Order"
+        cancelText="Cancel"
+        danger={true}
+        loading={deleting}
+      />
     </div>
   );
 };

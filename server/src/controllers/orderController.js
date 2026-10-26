@@ -1,6 +1,30 @@
+import mongoose from 'mongoose';
 import { Order } from '../models/Order.js';
 import { Customer } from '../models/Customer.js';
 import { generateNextOrderNumber } from '../models/OrderCounter.js';
+
+export const REQUIRED_SHIRT_FIELDS = ['length', 'chest', 'waist', 'shoulder', 'sleeveLength'];
+export const REQUIRED_PANT_FIELDS = ['length', 'waist', 'hip', 'bottomOpening'];
+
+export const validateGarmentMeasurements = (measurements = {}, requiredFields, garmentName) => {
+  for (const field of requiredFields) {
+    const val = measurements[field];
+    if (val === undefined || val === null || String(val).trim() === '') {
+      return `Required ${garmentName} measurement "${field}" is missing.`;
+    }
+  }
+
+  for (const [key, val] of Object.entries(measurements)) {
+    if (key !== 'notes' && val !== undefined && val !== null && String(val).trim() !== '') {
+      const num = parseFloat(val);
+      if (isNaN(num) || num <= 0) {
+        return `${garmentName.charAt(0).toUpperCase() + garmentName.slice(1)} measurement "${key}" must be a valid positive number.`;
+      }
+    }
+  }
+
+  return null;
+};
 
 export const getOrders = async (req, res, next) => {
   try {
@@ -158,6 +182,27 @@ export const createOrder = async (req, res, next) => {
         success: false,
         message: 'Please specify at least 1 shirt or 1 pant quantity',
       });
+    }
+
+    // Validate required measurements for garments with positive quantity
+    if (shirtQty > 0) {
+      const shirtErr = validateGarmentMeasurements(shirt.measurements, REQUIRED_SHIRT_FIELDS, 'shirt');
+      if (shirtErr) {
+        return res.status(400).json({
+          success: false,
+          message: shirtErr,
+        });
+      }
+    }
+
+    if (pantQty > 0) {
+      const pantErr = validateGarmentMeasurements(pant.measurements, REQUIRED_PANT_FIELDS, 'pant');
+      if (pantErr) {
+        return res.status(400).json({
+          success: false,
+          message: pantErr,
+        });
+      }
     }
 
     // Prepare patterns for shirt (only if shirtQty > 0)
@@ -445,6 +490,26 @@ export const updateOrder = async (req, res, next) => {
       });
     }
 
+    if ((order.shirt?.quantity || 0) > 0) {
+      const shirtErr = validateGarmentMeasurements(order.shirt.measurements, REQUIRED_SHIRT_FIELDS, 'shirt');
+      if (shirtErr) {
+        return res.status(400).json({
+          success: false,
+          message: shirtErr,
+        });
+      }
+    }
+
+    if ((order.pant?.quantity || 0) > 0) {
+      const pantErr = validateGarmentMeasurements(order.pant.measurements, REQUIRED_PANT_FIELDS, 'pant');
+      if (pantErr) {
+        return res.status(400).json({
+          success: false,
+          message: pantErr,
+        });
+      }
+    }
+
     if (specialInstructions !== undefined) {
       order.specialInstructions = specialInstructions ? specialInstructions.trim() : '';
     }
@@ -492,6 +557,41 @@ export const updateOrderStatus = async (req, res, next) => {
       success: true,
       message: 'Order status updated successfully',
       data: order,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Delete an order safely by ID
+ */
+export const deleteOrder = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid order ID',
+      });
+    }
+
+    const order = await Order.findById(id);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found',
+      });
+    }
+
+    const orderNumber = order.orderNumber;
+    await Order.findByIdAndDelete(id);
+
+    return res.json({
+      success: true,
+      message: `Order #${orderNumber} deleted successfully`,
+      data: { id, orderNumber },
     });
   } catch (error) {
     next(error);
