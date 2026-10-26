@@ -587,6 +587,28 @@ async function runTests() {
     await fetch(`${BASE_URL}/customers/${scenarioCustId}`, { method: 'DELETE', headers });
     console.log('✓ [Cleanup]: Cleaned up scenario test records.');
 
+    // 16. Standardized Pagination Contract & Empty Result Consistency
+    console.log('\n--- Testing Standardized Pagination Contract & Empty Result Consistency ---');
+    const ordersPagRes = await fetch(`${BASE_URL}/orders?page=1&limit=5`, { headers });
+    const ordersPagData = await ordersPagRes.json();
+    const pag = ordersPagData.pagination;
+    if (pag.totalRecords === undefined || pag.total === undefined || pag.totalPages === undefined) {
+      throw new Error('Pagination contract missing fields: ' + JSON.stringify(pag));
+    }
+    if (pag.total !== pag.totalRecords) {
+      throw new Error(`Pagination total mismatch: total=${pag.total}, totalRecords=${pag.totalRecords}`);
+    }
+    console.log(`✓ [Pagination Contract]: Orders verified - Page: ${pag.page}, Limit: ${pag.limit}, Total: ${pag.total}, TotalPages: ${pag.totalPages}`);
+
+    // Verify empty search pagination returns 0 records & 0 totalPages
+    const emptySearchRes = await fetch(`${BASE_URL}/orders?search=nonexistent_query_xyz_123456`, { headers });
+    const emptySearchData = await emptySearchRes.json();
+    const emptyPag = emptySearchData.pagination;
+    if (emptyPag.totalRecords !== 0 || emptyPag.totalPages !== 0 || emptySearchData.data.length !== 0) {
+      throw new Error('Empty search failed pagination contract: ' + JSON.stringify(emptyPag));
+    }
+    console.log('✓ [Pagination Contract]: Empty query correctly returns totalRecords: 0, totalPages: 0, data: [].');
+
     console.log('\n========================================================');
     console.log('🎉 ALL INTEGRATION TESTS PASSED 100% SUCCESSFULLY! 🎉');
     console.log('========================================================\n');

@@ -1,32 +1,55 @@
-import React from 'react';
-import { Printer, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, FileText, ExternalLink, X, Printer } from 'lucide-react';
 import { formatDate } from '../../utils/dateUtils';
 import { SHIRT_FIELDS, PANT_FIELDS } from '../../utils/measurementLabels';
-import { getShirtPatternLabel, getPantPatternLabel } from '../../utils/patternOptions';
+import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import { downloadOrderSlipPdf, getOrderSlipPdfBlobUrl } from '../../services/orderSlipPdfService';
 
 export const OrderPrintSlip = ({ order, onClose }) => {
+  const { user } = useAuth();
+  const { success, error: toastError } = useToast();
+  const [generating, setGenerating] = useState(false);
+
   if (!order) return null;
 
-  const handlePrint = () => {
-    window.print();
+  const handleDownloadPdf = () => {
+    try {
+      setGenerating(true);
+      downloadOrderSlipPdf(order, user);
+      success(`PDF Order Slip for #${order.orderNumber} downloaded successfully!`);
+    } catch (err) {
+      toastError(err.message || 'Failed to generate PDF slip');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleOpenPdf = () => {
+    try {
+      const url = getOrderSlipPdfBlobUrl(order, user);
+      window.open(url, '_blank');
+    } catch (err) {
+      toastError(err.message || 'Failed to open PDF slip');
+    }
   };
 
   const shirtPatternDisplay = [
     ...(Array.isArray(order.shirt?.patterns) ? order.shirt.patterns : (order.shirt?.pattern ? [order.shirt.pattern] : [])),
     order.shirt?.customPattern
-  ].filter(Boolean).join(', ') || 'None';
+  ].filter(Boolean).join(', ') || 'Standard / None';
 
   const pantPatternDisplay = [
     ...(Array.isArray(order.pant?.patterns) ? order.pant.patterns : (order.pant?.pattern ? [order.pant.pattern] : [])),
     order.pant?.customPattern
-  ].filter(Boolean).join(', ') || 'None';
+  ].filter(Boolean).join(', ') || 'Standard / None';
 
   return (
     <div
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.75)',
+        backgroundColor: 'rgba(11, 31, 58, 0.75)',
         backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',
@@ -41,39 +64,79 @@ export const OrderPrintSlip = ({ order, onClose }) => {
           background: '#ffffff',
           borderRadius: '16px',
           width: '100%',
-          maxWidth: '720px',
+          maxWidth: '760px',
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          border: '1px solid var(--border-light)',
         }}
       >
-        {/* Modal Controls (Not printed) */}
+        {/* Modal Controls Bar */}
         <div
-          className="no-print"
           style={{
             padding: '16px 24px',
             borderBottom: '1px solid #e2e8f0',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            backgroundColor: '#f8fafc',
+            backgroundColor: '#0b1f3a',
+            color: '#ffffff',
             borderTopLeftRadius: '16px',
             borderTopRightRadius: '16px',
+            flexWrap: 'wrap',
+            gap: '12px',
           }}
         >
-          <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '1.05rem' }}>
-            Tailoring Slip / Order Summary
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <FileText size={20} color="var(--accent-gold)" />
+            <div style={{ fontWeight: 700, color: '#ffffff', fontSize: '1.05rem' }}>
+              Order Slip #{order.orderNumber}
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button onClick={handlePrint} className="btn btn-primary btn-sm">
-              <Printer size={16} /> Print Slip
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={handleOpenPdf}
+              className="btn btn-outline btn-sm"
+              style={{
+                borderColor: 'var(--accent-gold)',
+                color: 'var(--accent-gold)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+              title="Open full print-ready PDF in new tab"
+            >
+              <ExternalLink size={15} /> Open PDF
             </button>
             <button
-              onClick={onClose}
-              style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '4px' }}
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={generating}
+              className="btn btn-gold btn-sm"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              title="Download professional PDF order slip"
             >
-              <X size={20} />
+              <Download size={15} /> Download PDF Slip
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: 'none',
+                color: '#cbd5e1',
+                cursor: 'pointer',
+                padding: '6px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              aria-label="Close modal"
+            >
+              <X size={18} />
             </button>
           </div>
         </div>

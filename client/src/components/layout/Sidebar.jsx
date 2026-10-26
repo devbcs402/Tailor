@@ -160,11 +160,19 @@ export const Sidebar = ({ isOpen, onClose }) => {
 
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isItemActive = item.to === '/'
-              ? location.pathname === '/'
-              : item.to === '/settings'
-              ? location.pathname.startsWith('/settings')
-              : location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
+            const currentPath = location.pathname;
+            const isItemActive =
+              item.to === '/'
+                ? currentPath === '/'
+                : item.to === '/orders/create'
+                ? currentPath === '/orders/create'
+                : item.to === '/orders'
+                ? currentPath === '/orders' || (currentPath.startsWith('/orders/') && currentPath !== '/orders/create')
+                : item.to === '/customers'
+                ? currentPath === '/customers' || currentPath.startsWith('/customers/')
+                : item.to === '/settings'
+                ? currentPath === '/settings' || currentPath.startsWith('/settings/')
+                : currentPath === item.to;
 
             return (
               <NavLink

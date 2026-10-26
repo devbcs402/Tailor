@@ -97,6 +97,7 @@ export const getOrders = async (req, res, next) => {
     }
 
     const total = await Order.countDocuments(query);
+    const totalPages = Math.ceil(total / limitNum) || 0;
     const orders = await Order.find(query)
       .populate('customer', 'name mobileNumber')
       .sort(sortOptions)
@@ -109,9 +110,10 @@ export const getOrders = async (req, res, next) => {
       data: orders,
       pagination: {
         total,
+        totalRecords: total,
         page: pageNum,
         limit: limitNum,
-        totalPages: Math.ceil(total / limitNum) || 1,
+        totalPages,
       },
     });
   } catch (error) {

@@ -26,15 +26,15 @@ export const ShirtMeasurements = ({
         setLoadingPatterns(true);
         const res = await patternsApi.getPatterns({ type: 'shirt' });
         if (isMounted) {
-          if (res.data && res.data.length > 0) {
+          if (res.data && Array.isArray(res.data)) {
             setAvailablePatterns(res.data.map((p) => p.name));
           } else {
-            setAvailablePatterns(['Plain', 'Chex', 'Stripes', 'Printed', 'Kurta Collar', 'Chinese Collar']);
+            setAvailablePatterns([]);
           }
         }
       } catch (err) {
         if (isMounted) {
-          setAvailablePatterns(['Plain', 'Chex', 'Stripes', 'Printed', 'Kurta Collar', 'Chinese Collar']);
+          setAvailablePatterns([]);
         }
       } finally {
         if (isMounted) setLoadingPatterns(false);
@@ -146,7 +146,7 @@ export const ShirtMeasurements = ({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+            gridTemplateColumns: availablePatterns.length > 0 ? 'repeat(auto-fill, minmax(140px, 1fr))' : '1fr',
             gap: '10px',
             padding: '14px',
             backgroundColor: isAvailable ? '#f8f7f2' : '#f1f5f9',
@@ -154,7 +154,12 @@ export const ShirtMeasurements = ({
             border: '1px solid var(--border-light)',
           }}
         >
-          {availablePatterns.map((pat) => {
+          {availablePatterns.length === 0 && !loadingPatterns ? (
+            <div style={{ padding: '8px', fontSize: '0.86rem', color: 'var(--text-muted)' }}>
+              No shirt patterns configured. You can enter a custom pattern below or manage patterns in Pattern Settings.
+            </div>
+          ) : (
+            availablePatterns.map((pat) => {
             const isChecked = selectedPatterns.includes(pat);
             return (
               <label
@@ -188,7 +193,7 @@ export const ShirtMeasurements = ({
                 <span>{pat}</span>
               </label>
             );
-          })}
+          }))}
         </div>
 
         {/* Additional Custom Shirt Pattern */}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -20,12 +20,15 @@ import { formatDate } from '../utils/dateUtils';
 
 export const CustomersPage = () => {
   const [customers, setCustomers] = useState([]);
-  const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0, totalPages: 1 });
+  const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0, totalRecords: 0, totalPages: 1 });
   const [pageSize, setPageSize] = useState(15);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('newest'); // 'newest' | 'oldest' | 'name_asc' | 'name_desc'
+
+  // Track active request ID to ignore stale responses
+  const activeRequestRef = useRef(0);
 
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -34,6 +37,7 @@ export const CustomersPage = () => {
   const navigate = useNavigate();
 
   const fetchCustomers = async (page = 1, currentSize = pageSize) => {
+    const requestId = ++activeRequestRef.current;
     setLoading(true);
     setError('');
     try {
@@ -43,26 +47,53 @@ export const CustomersPage = () => {
         search: search.trim(),
         sortBy,
       });
+
+      // Discard response if a newer request was triggered
+      if (activeRequestRef.current !== requestId) return;
+
       setCustomers(res.data || []);
-      setPagination(res.pagination || { page: 1, limit: currentSize, total: 0, totalPages: 1 });
+      const p = res.pagination || {};
+      const totalCount = p.total !== undefined ? p.total : (p.totalRecords || 0);
+      const totalPages = p.totalPages !== undefined ? p.totalPages : (Math.ceil(totalCount / currentSize) || 0);
+      setPagination({
+        page: p.page || page,
+        limit: p.limit || currentSize,
+        total: totalCount,
+        totalRecords: totalCount,
+        totalPages,
+      });
+
+      // Self-correct if current page exceeds total pages
+      if (page > totalPages && totalPages > 0) {
+        fetchCustomers(totalPages, currentSize);
+      }
     } catch (err) {
-      setError(err.message || 'Failed to fetch customers list');
+      if (activeRequestRef.current === requestId) {
+        setError(err.message || 'Failed to fetch customers list');
+      }
     } finally {
-      setLoading(false);
+      if (activeRequestRef.current === requestId) {
+        setLoading(false);
+      }
     }
   };
 
+  // Re-fetch on search, sort, or pageSize change (reset to page 1)
   useEffect(() => {
     fetchCustomers(1, pageSize);
   }, [search, sortBy, pageSize]);
 
   const handlePageChange = (newPage) => {
+    if (newPage === pagination.page || newPage < 1 || (pagination.totalPages > 0 && newPage > pagination.totalPages)) {
+      return;
+    }
     fetchCustomers(newPage, pageSize);
   };
 
+  // Only update pageSize state; the useEffect on pageSize will trigger the single required request
   const handlePageSizeChange = (newSize) => {
+    if (newSize === pageSize) return;
     setPageSize(newSize);
-    fetchCustomers(1, newSize);
   };
 
   const handleResetFilters = () => {

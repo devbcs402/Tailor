@@ -277,9 +277,11 @@ export const CustomerDetailsPage = () => {
           /* Readonly Measurement Display */
           <MeasurementDisplay
             measurements={lm}
-            shirtPattern={lm.shirtPattern || 'plain'}
+            shirtPattern={lm.shirtPattern || ''}
+            shirtPatterns={lm.shirtPatterns || []}
             shirtCustomPattern={lm.shirtCustomPattern || ''}
-            pantPattern={lm.pantPattern || 'plain_pant'}
+            pantPattern={lm.pantPattern || ''}
+            pantPatterns={lm.pantPatterns || []}
             pantCustomPattern={lm.pantCustomPattern || ''}
             updatedAt={lm.updatedAt}
           />

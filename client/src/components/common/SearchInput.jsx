@@ -13,20 +13,29 @@ export const SearchInput = ({
 }) => {
   const [localValue, setLocalValue] = useState(value);
   const isFirstRender = useRef(true);
+  const lastEmittedValue = useRef(value);
 
   // Sync with external value changes
   useEffect(() => {
-    setLocalValue(value);
+    if (value !== localValue) {
+      setLocalValue(value);
+      lastEmittedValue.current = value;
+    }
   }, [value]);
 
-  // Debounced search trigger
+  // Debounced search trigger (fires only when user actually changed value)
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
     }
 
+    if (localValue === lastEmittedValue.current) {
+      return;
+    }
+
     const timer = setTimeout(() => {
+      lastEmittedValue.current = localValue;
       if (onChange) {
         onChange(localValue);
       }
@@ -37,6 +46,7 @@ export const SearchInput = ({
 
   const handleClear = () => {
     setLocalValue('');
+    lastEmittedValue.current = '';
     if (onChange) {
       onChange('');
     }

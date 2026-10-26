@@ -10,6 +10,7 @@ import {
   FileText,
   Edit,
   Trash2,
+  Download,
 } from 'lucide-react';
 import { ordersApi } from '../api/ordersApi';
 import { Loading } from '../components/common/Loading';
@@ -23,10 +24,13 @@ import { OrderPrintSlip } from '../components/orders/OrderPrintSlip';
 import { EditOrderModal } from '../components/orders/EditOrderModal';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
+import { downloadOrderSlipPdf } from '../services/orderSlipPdfService';
 
 export const OrderDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { success, error: toastError } = useToast();
 
   const [order, setOrder] = useState(null);
@@ -116,8 +120,25 @@ export const OrderDetailsPage = () => {
           <button
             onClick={() => setShowPrintModal(true)}
             className="btn btn-primary btn-sm"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            title="Preview Order Slip Modal"
           >
-            <Printer size={16} /> Print Slip
+            <FileText size={15} /> Order Slip
+          </button>
+          <button
+            onClick={() => {
+              try {
+                downloadOrderSlipPdf(order, user);
+                success(`Order Slip #${order.orderNumber} downloaded!`);
+              } catch (err) {
+                toastError(err.message || 'Failed to generate PDF');
+              }
+            }}
+            className="btn btn-gold btn-sm"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            title="Download PDF order slip directly"
+          >
+            <Download size={15} /> Download PDF
           </button>
           <button
             onClick={() => setShowDeleteDialog(true)}

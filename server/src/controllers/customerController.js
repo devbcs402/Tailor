@@ -79,9 +79,10 @@ export const getCustomers = async (req, res, next) => {
       data: enrichedCustomers,
       pagination: {
         total,
+        totalRecords: total,
         page: pageNum,
         limit: limitNum,
-        totalPages: Math.ceil(total / limitNum) || 1,
+        totalPages: Math.ceil(total / limitNum) || 0,
       },
     });
   } catch (error) {

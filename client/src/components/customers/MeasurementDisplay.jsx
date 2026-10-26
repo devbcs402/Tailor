@@ -21,13 +21,16 @@ export const MeasurementDisplay = ({
     ...(Array.isArray(shirtPatterns) && shirtPatterns.length ? shirtPatterns : []),
     shirtPattern && shirtPattern !== 'plain' ? getShirtPatternLabel(shirtPattern, '') : null,
     shirtCustomPattern
-  ].filter(Boolean).join(', ') || 'Standard / Plain';
+  ].filter(Boolean).join(', ') || 'None specified';
 
   const pantPatDisplay = [
     ...(Array.isArray(pantPatterns) && pantPatterns.length ? pantPatterns : []),
     pantPattern && pantPattern !== 'plain_pant' ? getPantPatternLabel(pantPattern, '') : null,
     pantCustomPattern
-  ].filter(Boolean).join(', ') || 'Standard / Plain';
+  ].filter(Boolean).join(', ') || 'None specified';
+
+  const hasShirtMeasurements = Object.values(shirt).some((v) => v && String(v).trim().length > 0);
+  const hasPantMeasurements = Object.values(pant).some((v) => v && String(v).trim().length > 0);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

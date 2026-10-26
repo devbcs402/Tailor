@@ -5,6 +5,27 @@
 :root {
   --font-primary: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
+  /* Bootstrap 5 Framework Variable Standardization */
+  --bs-primary: #0b1f3a;
+  --bs-primary-rgb: 11, 31, 58;
+  --bs-secondary: #142d4e;
+  --bs-secondary-rgb: 20, 45, 78;
+  --bs-warning: #d4af37;
+  --bs-warning-rgb: 212, 175, 55;
+  --bs-info: #0284c7;
+  --bs-success: #16a34a;
+  --bs-danger: #ef4444;
+  --bs-light: #f8f7f2;
+  --bs-dark: #0b1f3a;
+  --bs-body-bg: #f8f7f2;
+  --bs-body-color: #172033;
+  --bs-card-bg: #ffffff;
+  --bs-border-color: #e5e7eb;
+  --bs-border-radius: 10px;
+  --bs-border-radius-sm: 6px;
+  --bs-border-radius-lg: 14px;
+  --bs-font-sans-serif: var(--font-primary);
+
   /* Color Palette - Navy Blue + Gold Premium Tailoring Theme */
   --bg-app: #f8f7f2;               /* Light warm white */
   --bg-surface: #ffffff;           /* Card background */

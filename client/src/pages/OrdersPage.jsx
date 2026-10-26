@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus,
@@ -7,6 +7,7 @@ import {
   ArrowUp,
   ArrowDown,
   Printer,
+  FileText,
   RotateCcw,
   Trash2,
 } from 'lucide-react';
@@ -24,10 +25,13 @@ import { useToast } from '../context/ToastContext';
 
 export const OrdersPage = () => {
   const [orders, setOrders] = useState([]);
-  const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0, totalPages: 1 });
+  const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0, totalRecords: 0, totalPages: 1 });
   const [pageSize, setPageSize] = useState(15);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Prevent race conditions and stale responses
+  const activeRequestRef = useRef(0);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get('search') || '');
@@ -43,6 +47,7 @@ export const OrdersPage = () => {
   const navigate = useNavigate();
 
   const fetchOrders = async (page = 1, currentSize = pageSize) => {
+    const requestId = ++activeRequestRef.current;
     setLoading(true);
     setError('');
     try {
@@ -57,16 +62,38 @@ export const OrdersPage = () => {
       }
 
       const res = await ordersApi.getOrders(params);
+
+      // Discard stale response if a newer request was triggered
+      if (activeRequestRef.current !== requestId) return;
+
       setOrders(res.data || []);
-      setPagination(res.pagination || { page: 1, limit: currentSize, total: 0, totalPages: 1 });
+      const p = res.pagination || {};
+      const totalCount = p.total !== undefined ? p.total : (p.totalRecords || 0);
+      const totalPages = p.totalPages !== undefined ? p.totalPages : (Math.ceil(totalCount / currentSize) || 0);
+      setPagination({
+        page: p.page || page,
+        limit: p.limit || currentSize,
+        total: totalCount,
+        totalRecords: totalCount,
+        totalPages,
+      });
+
+      // Self-correct if current page exceeds total pages (e.g., after deletions or filtering)
+      if (page > totalPages && totalPages > 0) {
+        fetchOrders(totalPages, currentSize);
+      }
     } catch (err) {
-      setError(err.message || 'Error fetching orders list');
+      if (activeRequestRef.current === requestId) {
+        setError(err.message || 'Error fetching orders list');
+      }
     } finally {
-      setLoading(false);
+      if (activeRequestRef.current === requestId) {
+        setLoading(false);
+      }
     }
   };
 
-  // Re-fetch on filter or sort or search change (reset to page 1)
+  // Re-fetch on filter or sort or search or pageSize change (reset to page 1)
   useEffect(() => {
     fetchOrders(1, pageSize);
   }, [search, statusFilter, sortBy, pageSize]);
@@ -78,12 +105,16 @@ export const OrdersPage = () => {
   };
 
   const handlePageChange = (newPage) => {
+    if (newPage === pagination.page || newPage < 1 || (pagination.totalPages > 0 && newPage > pagination.totalPages)) {
+      return;
+    }
     fetchOrders(newPage, pageSize);
   };
 
+  // Only update pageSize state; the useEffect on pageSize will trigger the single necessary request
   const handlePageSizeChange = (newSize) => {
+    if (newSize === pageSize) return;
     setPageSize(newSize);
-    fetchOrders(1, newSize);
   };
 
   const handleDeleteOrder = async () => {
