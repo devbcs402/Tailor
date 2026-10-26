@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User.js';
+import { Tenant } from '../models/Tenant.js';
 
 export const requireAuth = async (req, res, next) => {
   try {
@@ -22,6 +23,34 @@ export const requireAuth = async (req, res, next) => {
       });
     }
 
+    if (!user.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: 'User account has been deactivated. Please contact administrator.',
+      });
+    }
+
+    // Tenant check for tenant-scoped users
+    if (user.role !== 'platform_owner' && user.tenantId) {
+      const tenant = await Tenant.findById(user.tenantId);
+      if (!tenant) {
+        return res.status(403).json({
+          success: false,
+          message: 'Associated tailoring business tenant not found.',
+        });
+      }
+
+      if (tenant.status === 'inactive') {
+        return res.status(403).json({
+          success: false,
+          code: 'TENANT_INACTIVE',
+          message: 'Your business account has been deactivated. Please contact platform support.',
+        });
+      }
+
+      req.tenant = tenant;
+    }
+
     req.user = user;
     next();
   } catch (error) {
@@ -31,4 +60,45 @@ export const requireAuth = async (req, res, next) => {
       error: error.message,
     });
   }
+};
+
+/**
+ * Middleware: Strictly requires Platform Owner role
+ */
+export const requireOwner = (req, res, next) => {
+  if (!req.user || req.user.role !== 'platform_owner') {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied: Platform owner authorization required.',
+    });
+  }
+  next();
+};
+
+/**
+ * Middleware: Requires an active Tenant Context
+ */
+export const requireTenant = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required.',
+    });
+  }
+
+  if (req.user.role === 'platform_owner') {
+    return res.status(403).json({
+      success: false,
+      message: 'Platform owner cannot directly modify business data without explicit tenant scoping.',
+    });
+  }
+
+  if (!req.user.tenantId || !req.tenant) {
+    return res.status(403).json({
+      success: false,
+      message: 'Tenant access required.',
+    });
+  }
+
+  next();
 };

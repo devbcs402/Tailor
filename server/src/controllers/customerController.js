@@ -8,12 +8,14 @@ const normalizeMobile = (mobile) => {
 
 export const getCustomers = async (req, res, next) => {
   try {
+    const tenantId = req.user.tenantId;
     const { search = '', sortBy = 'newest', page = 1, limit = 20 } = req.query;
     const pageNum = Math.max(1, parseInt(page, 10));
     const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10)));
     const skip = (pageNum - 1) * limitNum;
 
-    const query = { isActive: true };
+    // Strictly enforce tenant isolation
+    const query = { tenantId, isActive: true };
     if (search.trim()) {
       const regex = new RegExp(search.trim(), 'i');
       query.$or = [{ name: regex }, { mobileNumber: regex }, { address: regex }];
@@ -37,10 +39,10 @@ export const getCustomers = async (req, res, next) => {
       .limit(limitNum)
       .lean();
 
-    // Enrich customers with order count & next deadline
+    // Enrich customers with order count & next deadline (scoped to this tenant)
     const customerIds = customers.map((c) => c._id);
     const orderStats = await Order.aggregate([
-      { $match: { customer: { $in: customerIds } } },
+      { $match: { tenantId, customer: { $in: customerIds } } },
       {
         $group: {
           _id: '$customer',
@@ -84,6 +86,11 @@ export const getCustomers = async (req, res, next) => {
         limit: limitNum,
         totalPages: Math.ceil(total / limitNum) || 0,
       },
+      total,
+      totalRecords: total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum) || 0,
     });
   } catch (error) {
     next(error);
@@ -92,8 +99,9 @@ export const getCustomers = async (req, res, next) => {
 
 export const getCustomerById = async (req, res, next) => {
   try {
+    const tenantId = req.user.tenantId;
     const { id } = req.params;
-    const customer = await Customer.findById(id);
+    const customer = await Customer.findOne({ _id: id, tenantId });
 
     if (!customer) {
       return res.status(404).json({
@@ -113,6 +121,7 @@ export const getCustomerById = async (req, res, next) => {
 
 export const createCustomer = async (req, res, next) => {
   try {
+    const tenantId = req.user.tenantId;
     const { name, mobileNumber, address, notes, latestMeasurements } = req.body;
 
     if (!name || !name.trim() || name.trim().length < 2) {
@@ -137,8 +146,8 @@ export const createCustomer = async (req, res, next) => {
       });
     }
 
-    // Check if customer already exists with this mobile number
-    const existing = await Customer.findOne({ mobileNumber: cleanMobile });
+    // Check if customer already exists within THIS tenant
+    const existing = await Customer.findOne({ tenantId, mobileNumber: cleanMobile });
     if (existing) {
       return res.status(400).json({
         success: false,
@@ -148,6 +157,7 @@ export const createCustomer = async (req, res, next) => {
     }
 
     const customer = new Customer({
+      tenantId,
       name: name.trim(),
       mobileNumber: cleanMobile,
       address: address ? address.trim() : '',
@@ -169,10 +179,11 @@ export const createCustomer = async (req, res, next) => {
 
 export const updateCustomer = async (req, res, next) => {
   try {
+    const tenantId = req.user.tenantId;
     const { id } = req.params;
     const { name, mobileNumber, address, notes, isActive } = req.body;
 
-    const customer = await Customer.findById(id);
+    const customer = await Customer.findOne({ _id: id, tenantId });
     if (!customer) {
       return res.status(404).json({
         success: false,
@@ -197,8 +208,9 @@ export const updateCustomer = async (req, res, next) => {
           message: 'Mobile number must be exactly 10 digits',
         });
       }
-      // Check collision
+      // Check collision within this tenant only
       const duplicate = await Customer.findOne({
+        tenantId,
         mobileNumber: cleanMobile,
         _id: { $ne: id },
       });
@@ -228,6 +240,7 @@ export const updateCustomer = async (req, res, next) => {
 
 export const updateCustomerMeasurements = async (req, res, next) => {
   try {
+    const tenantId = req.user.tenantId;
     const { id } = req.params;
     const { measurements } = req.body;
 
@@ -238,7 +251,7 @@ export const updateCustomerMeasurements = async (req, res, next) => {
       });
     }
 
-    const customer = await Customer.findById(id);
+    const customer = await Customer.findOne({ _id: id, tenantId });
     if (!customer) {
       return res.status(404).json({
         success: false,
@@ -266,8 +279,9 @@ export const updateCustomerMeasurements = async (req, res, next) => {
 
 export const getCustomerOrders = async (req, res, next) => {
   try {
+    const tenantId = req.user.tenantId;
     const { id } = req.params;
-    const orders = await Order.find({ customer: id }).sort({ orderDate: -1 });
+    const orders = await Order.find({ customer: id, tenantId }).sort({ orderDate: -1 });
 
     return res.json({
       success: true,

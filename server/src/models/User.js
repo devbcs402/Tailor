@@ -21,12 +21,24 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['admin', 'tailor'],
+      enum: ['platform_owner', 'admin', 'tailor', 'staff'],
       default: 'admin',
+      index: true,
+    },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      default: null,
+      index: true,
     },
     shopName: {
       type: String,
       default: 'Silai Master Tailor Studio',
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+      index: true,
     },
   },
   {

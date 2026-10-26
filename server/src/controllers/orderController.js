@@ -28,6 +28,7 @@ export const validateGarmentMeasurements = (measurements = {}, requiredFields, g
 
 export const getOrders = async (req, res, next) => {
   try {
+    const tenantId = req.user.tenantId;
     const {
       search = '',
       status = '',
@@ -42,7 +43,7 @@ export const getOrders = async (req, res, next) => {
     const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10)));
     const skip = (pageNum - 1) * limitNum;
 
-    const query = {};
+    const query = { tenantId };
 
     // Search filter across orderNumber, customer name/mobile, and pattern fields
     if (search.trim()) {
@@ -115,6 +116,11 @@ export const getOrders = async (req, res, next) => {
         limit: limitNum,
         totalPages,
       },
+      total,
+      totalRecords: total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages,
     });
   } catch (error) {
     next(error);
@@ -123,8 +129,9 @@ export const getOrders = async (req, res, next) => {
 
 export const getOrderById = async (req, res, next) => {
   try {
+    const tenantId = req.user.tenantId;
     const { id } = req.params;
-    const order = await Order.findById(id).populate('customer');
+    const order = await Order.findOne({ _id: id, tenantId }).populate('customer');
 
     if (!order) {
       return res.status(404).json({
@@ -224,6 +231,7 @@ export const createOrder = async (req, res, next) => {
       : (pant.pattern !== undefined ? String(pant.pattern).trim() : '');
 
     let targetCustomer;
+    const tenantId = req.user.tenantId;
 
     // Handle New vs Existing Customer
     if (isNewCustomer) {
@@ -249,8 +257,8 @@ export const createOrder = async (req, res, next) => {
         });
       }
 
-      // Check existing mobile number
-      let existing = await Customer.findOne({ mobileNumber: cleanMobile });
+      // Check existing mobile number within THIS tenant
+      let existing = await Customer.findOne({ tenantId, mobileNumber: cleanMobile });
       if (existing) {
         return res.status(400).json({
           success: false,
@@ -259,8 +267,9 @@ export const createOrder = async (req, res, next) => {
         });
       }
 
-      // Create new customer
+      // Create new customer for this tenant
       targetCustomer = new Customer({
+        tenantId,
         name: name.trim(),
         mobileNumber: cleanMobile,
         address: address ? address.trim() : '',
@@ -288,11 +297,12 @@ export const createOrder = async (req, res, next) => {
         });
       }
 
-      targetCustomer = await Customer.findById(customerId);
+      // Ensure customer belongs strictly to this tenant
+      targetCustomer = await Customer.findOne({ _id: customerId, tenantId });
       if (!targetCustomer) {
         return res.status(404).json({
           success: false,
-          message: 'Selected customer not found',
+          message: 'Selected customer not found or belongs to another business',
         });
       }
 
@@ -316,10 +326,11 @@ export const createOrder = async (req, res, next) => {
       }
     }
 
-    // Collision-safe atomic sequence order number
-    let orderNumber = await generateNextOrderNumber();
+    // Collision-safe atomic sequence order number scoped per tenant
+    let orderNumber = await generateNextOrderNumber(tenantId);
 
     const newOrder = new Order({
+      tenantId,
       orderNumber,
       customer: targetCustomer._id,
       customerSnapshot: {
@@ -381,7 +392,7 @@ export const updateOrder = async (req, res, next) => {
       specialInstructions,
     } = req.body;
 
-    const order = await Order.findById(id);
+    const order = await Order.findOne({ _id: id, tenantId: req.user.tenantId });
     if (!order) {
       return res.status(404).json({
         success: false,
@@ -542,8 +553,8 @@ export const updateOrderStatus = async (req, res, next) => {
       });
     }
 
-    const order = await Order.findByIdAndUpdate(
-      id,
+    const order = await Order.findOneAndUpdate(
+      { _id: id, tenantId: req.user.tenantId },
       { $set: { status } },
       { new: true }
     );
@@ -579,7 +590,7 @@ export const deleteOrder = async (req, res, next) => {
       });
     }
 
-    const order = await Order.findById(id);
+    const order = await Order.findOne({ _id: id, tenantId: req.user.tenantId });
     if (!order) {
       return res.status(404).json({
         success: false,
@@ -588,7 +599,7 @@ export const deleteOrder = async (req, res, next) => {
     }
 
     const orderNumber = order.orderNumber;
-    await Order.findByIdAndDelete(id);
+    await Order.deleteOne({ _id: id, tenantId: req.user.tenantId });
 
     return res.json({
       success: true,

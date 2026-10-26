@@ -1,7 +1,7 @@
 import { Pattern } from '../models/Pattern.js';
 
-// Default initial patterns to seed on first load
-const DEFAULT_SHIRT_PATTERNS = [
+// Default initial patterns to seed for newly created tenants
+export const DEFAULT_SHIRT_PATTERNS = [
   'Plain',
   'Chex',
   'Stripes',
@@ -10,7 +10,7 @@ const DEFAULT_SHIRT_PATTERNS = [
   'Chinese Collar',
 ];
 
-const DEFAULT_PANT_PATTERNS = [
+export const DEFAULT_PANT_PATTERNS = [
   'Plain',
   'Formal',
   'Two Pocket',
@@ -26,35 +26,35 @@ const escapeRegex = (string) => {
 };
 
 /**
- * Seed initial patterns if collection is empty
+ * Seed initial patterns for a new tenant
  */
-const seedDefaultPatternsIfEmpty = async () => {
+export const seedTenantDefaultPatterns = async (tenantId) => {
   try {
-    const count = await Pattern.countDocuments();
+    const count = await Pattern.countDocuments({ tenantId });
     if (count === 0) {
       const initialDocs = [
-        ...DEFAULT_SHIRT_PATTERNS.map((name) => ({ name, type: 'shirt', isActive: true })),
-        ...DEFAULT_PANT_PATTERNS.map((name) => ({ name, type: 'pant', isActive: true })),
+        ...DEFAULT_SHIRT_PATTERNS.map((name) => ({ tenantId, name, type: 'shirt', isActive: true })),
+        ...DEFAULT_PANT_PATTERNS.map((name) => ({ tenantId, name, type: 'pant', isActive: true })),
       ];
       await Pattern.insertMany(initialDocs);
-      console.log('✓ [Pattern Seeder]: Initial shirt and pant patterns seeded successfully.');
+      return initialDocs.length;
     }
+    return 0;
   } catch (err) {
-    console.error('Failed to seed default patterns:', err);
+    console.error(`[Pattern Seeder] Failed to seed default patterns for tenant ${tenantId}:`, err);
+    return 0;
   }
 };
 
-// Seed on startup check
-seedDefaultPatternsIfEmpty();
-
 /**
- * Get patterns (filtered by type: 'shirt' | 'pant' and optional search)
+ * Get patterns (filtered by type: 'shirt' | 'pant' and optional search, scoped to tenant)
  */
 export const getPatterns = async (req, res, next) => {
   try {
+    const tenantId = req.user.tenantId;
     const { type, search = '', all = false } = req.query;
 
-    const query = {};
+    const query = { tenantId };
     if (!all) {
       query.isActive = true;
     }
@@ -79,10 +79,11 @@ export const getPatterns = async (req, res, next) => {
 };
 
 /**
- * Create a new pattern
+ * Create a new pattern for the tenant
  */
 export const createPattern = async (req, res, next) => {
   try {
+    const tenantId = req.user.tenantId;
     const { name, type } = req.body;
 
     if (!name || !name.trim()) {
@@ -102,8 +103,9 @@ export const createPattern = async (req, res, next) => {
     const trimmedName = name.trim();
     const patternType = type.toLowerCase();
 
-    // Check for case-insensitive duplicate within the same type
+    // Check for case-insensitive duplicate within the same tenant & type
     const duplicate = await Pattern.findOne({
+      tenantId,
       type: patternType,
       isActive: true,
       name: { $regex: new RegExp(`^${escapeRegex(trimmedName)}$`, 'i') },
@@ -116,8 +118,9 @@ export const createPattern = async (req, res, next) => {
       });
     }
 
-    // Check if an inactive pattern with this name exists, reactivate it if so
+    // Check if an inactive pattern with this name exists in this tenant, reactivate it if so
     const inactivePattern = await Pattern.findOne({
+      tenantId,
       type: patternType,
       isActive: false,
       name: { $regex: new RegExp(`^${escapeRegex(trimmedName)}$`, 'i') },
@@ -135,6 +138,7 @@ export const createPattern = async (req, res, next) => {
     }
 
     const newPattern = new Pattern({
+      tenantId,
       name: trimmedName,
       type: patternType,
       isActive: true,
@@ -153,10 +157,11 @@ export const createPattern = async (req, res, next) => {
 };
 
 /**
- * Update an existing pattern name
+ * Update an existing pattern name (scoped to tenant)
  */
 export const updatePattern = async (req, res, next) => {
   try {
+    const tenantId = req.user.tenantId;
     const { id } = req.params;
     const { name } = req.body;
 
@@ -167,7 +172,7 @@ export const updatePattern = async (req, res, next) => {
       });
     }
 
-    const pattern = await Pattern.findById(id);
+    const pattern = await Pattern.findOne({ _id: id, tenantId });
     if (!pattern) {
       return res.status(404).json({
         success: false,
@@ -177,8 +182,9 @@ export const updatePattern = async (req, res, next) => {
 
     const trimmedName = name.trim();
 
-    // Check duplicate among other active patterns of the same type
+    // Check duplicate among other active patterns of the same tenant & type
     const duplicate = await Pattern.findOne({
+      tenantId,
       _id: { $ne: id },
       type: pattern.type,
       isActive: true,
@@ -206,13 +212,14 @@ export const updatePattern = async (req, res, next) => {
 };
 
 /**
- * Delete a pattern (Safe soft-deletion to protect historical orders)
+ * Delete a pattern (Safe soft-deletion within tenant to protect historical orders)
  */
 export const deletePattern = async (req, res, next) => {
   try {
+    const tenantId = req.user.tenantId;
     const { id } = req.params;
 
-    const pattern = await Pattern.findById(id);
+    const pattern = await Pattern.findOne({ _id: id, tenantId });
     if (!pattern) {
       return res.status(404).json({
         success: false,

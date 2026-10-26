@@ -2,10 +2,15 @@ import mongoose from 'mongoose';
 
 const orderSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: [true, 'Tenant ID is required'],
+      index: true,
+    },
     orderNumber: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
       index: true,
     },
@@ -95,9 +100,10 @@ const orderSchema = new mongoose.Schema(
   }
 );
 
-// Compound indexes for searching & filtering
+// Compound indexes for tenant-scoped searching, filtering, and unique order numbers per tenant
+orderSchema.index({ tenantId: 1, orderNumber: 1 }, { unique: true });
+orderSchema.index({ tenantId: 1, status: 1, deadline: 1 });
+orderSchema.index({ tenantId: 1, orderDate: -1 });
 orderSchema.index({ orderNumber: 'text', 'customerSnapshot.name': 'text', 'customerSnapshot.mobileNumber': 'text' });
-orderSchema.index({ status: 1, deadline: 1 });
-orderSchema.index({ orderDate: -1 });
 
 export const Order = mongoose.model('Order', orderSchema);

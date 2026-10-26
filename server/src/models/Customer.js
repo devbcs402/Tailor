@@ -71,6 +71,12 @@ const latestMeasurementsSchema = new mongoose.Schema(
 
 const customerSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: [true, 'Tenant ID is required'],
+      index: true,
+    },
     customerCode: {
       type: String,
       trim: true,
@@ -103,6 +109,7 @@ const customerSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true,
+      index: true,
     },
   },
   {
@@ -110,7 +117,9 @@ const customerSchema = new mongoose.Schema(
   }
 );
 
-// Indexes
-customerSchema.index({ name: 'text', mobileNumber: 'text' });
+// Indexes: Mobile number unique per tenant
+customerSchema.index({ tenantId: 1, mobileNumber: 1 });
+customerSchema.index({ tenantId: 1, createdAt: -1 });
+customerSchema.index({ name: 'text', mobileNumber: 'text', address: 'text' });
 
 export const Customer = mongoose.model('Customer', customerSchema);
