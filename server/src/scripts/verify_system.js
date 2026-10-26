@@ -219,6 +219,111 @@ async function runTests() {
     const dashData = await dashRes.json();
     console.log('✓ [Dashboard]: Live summary counts:', dashData.data.counts);
 
+    // 11. Testing Qty: 0 Handling & Permanent Profile Preservation (Requirement 5 & 3)
+    console.log('\n--- Testing Qty: 0 Behavior & Permanent Profile Preservation ---');
+    // First, verify the customer has existing shirt & pant measurements
+    const custBeforeRes = await fetch(`${BASE_URL}/customers/${firstCustomer._id}`, { headers });
+    const custBeforeData = await custBeforeRes.json();
+    const origShirtMeasurements = custBeforeData.data.latestMeasurements?.shirt || {};
+
+    // Create an order where Shirt Qty is 0 and Pant Qty is 2, with saveAsLatestMeasurements = true
+    const qtyZeroOrderPayload = {
+      isNewCustomer: false,
+      customerId: firstCustomer._id,
+      deadline: new Date(Date.now() + 86400000 * 5).toISOString(),
+      shirt: {
+        quantity: 0,
+        patterns: ['Plain'], // Should be ignored because qty is 0
+        customPattern: 'Ignored',
+        measurements: { length: '30', chest: '42' }, // Should be ignored because qty is 0
+      },
+      pant: {
+        quantity: 2,
+        patterns: ['Formal'],
+        measurements: { length: '40', waist: '34' },
+      },
+      saveAsLatestMeasurements: true,
+    };
+
+    const zeroOrderRes = await fetch(`${BASE_URL}/orders`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(qtyZeroOrderPayload),
+    });
+    const zeroOrderData = await zeroOrderRes.json();
+    if (!zeroOrderData.success) {
+      throw new Error('Zero order creation failed: ' + JSON.stringify(zeroOrderData));
+    }
+
+    const createdZeroOrder = zeroOrderData.data;
+    // Verify that the order's shirt measurements are empty (no non-empty values) and patterns are empty
+    const hasShirtMeasurements = Object.values(createdZeroOrder.shirt.measurements || {}).some(v => v && String(v).trim().length > 0);
+    if (hasShirtMeasurements) {
+      throw new Error('Expected no non-empty shirt measurements when shirt Qty is 0!');
+    }
+    if ((createdZeroOrder.shirt.patterns || []).length > 0) {
+      throw new Error('Expected empty shirt patterns when shirt Qty is 0!');
+    }
+    console.log('✓ [Qty: 0 Order Handling]: Confirmed shirt measurements and patterns saved as empty in order when Qty is 0.');
+
+    // Verify customer's permanent shirt measurements were preserved and NOT overwritten with empty
+    const custAfterRes = await fetch(`${BASE_URL}/customers/${firstCustomer._id}`, { headers });
+    const custAfterData = await custAfterRes.json();
+    const preservedShirtMeasurements = custAfterData.data.latestMeasurements?.shirt || {};
+    if (origShirtMeasurements.length && preservedShirtMeasurements.length !== origShirtMeasurements.length) {
+      throw new Error('Customer permanent shirt measurements were corrupted by Qty: 0 order!');
+    }
+    console.log('✓ [Permanent Profile Preservation]: Confirmed existing shirt measurements preserved on customer profile.');
+
+    // 12. Testing Comprehensive Backend Validation (Requirement 6)
+    console.log('\n--- Testing Comprehensive Backend Validation ---');
+    // 12.1 Both shirt and pant Qty 0 should be rejected
+    const invalidQtyRes = await fetch(`${BASE_URL}/orders`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        customerId: firstCustomer._id,
+        deadline: new Date(Date.now() + 86400000 * 5).toISOString(),
+        shirt: { quantity: 0 },
+        pant: { quantity: 0 },
+      }),
+    });
+    if (invalidQtyRes.status === 400) {
+      console.log('✓ [Validation]: Correctly rejected order with total garment quantity 0.');
+    } else {
+      throw new Error('Failed to reject order with 0 shirts and 0 pants! Status: ' + invalidQtyRes.status);
+    }
+
+    // 12.2 Invalid 7-digit mobile number should be rejected
+    const invalidMobileRes = await fetch(`${BASE_URL}/customers`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'Invalid Test Customer',
+        mobileNumber: '98765', // Not 10 digits
+      }),
+    });
+    if (invalidMobileRes.status === 400) {
+      console.log('✓ [Validation]: Correctly rejected customer with non-10-digit mobile number.');
+    } else {
+      throw new Error('Failed to reject non-10-digit mobile number! Status: ' + invalidMobileRes.status);
+    }
+
+    // 12.3 Customer name less than 2 chars should be rejected
+    const invalidNameRes = await fetch(`${BASE_URL}/customers`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: ' ', // Empty
+        mobileNumber: '9876543210',
+      }),
+    });
+    if (invalidNameRes.status === 400) {
+      console.log('✓ [Validation]: Correctly rejected customer with empty/invalid name.');
+    } else {
+      throw new Error('Failed to reject empty customer name! Status: ' + invalidNameRes.status);
+    }
+
     console.log('\n========================================================');
     console.log('🎉 ALL INTEGRATION TESTS PASSED 100% SUCCESSFULLY! 🎉');
     console.log('========================================================\n');

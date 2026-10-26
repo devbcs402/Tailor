@@ -141,10 +141,11 @@ export const CustomerDetailsPage = () => {
       <div
         className="card"
         style={{
-          background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+          background: 'linear-gradient(135deg, #0b1f3a 0%, #142d4e 100%)',
           color: '#ffffff',
           padding: '28px',
           boxShadow: 'var(--shadow-lg)',
+          borderLeft: '5px solid var(--accent-gold)',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
@@ -154,14 +155,14 @@ export const CustomerDetailsPage = () => {
                 width: '64px',
                 height: '64px',
                 borderRadius: '50%',
-                backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                color: '#ffffff',
+                backgroundColor: 'rgba(212, 175, 55, 0.15)',
+                color: 'var(--accent-gold)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontWeight: 800,
                 fontSize: '1.75rem',
-                border: '2px solid rgba(255, 255, 255, 0.2)',
+                border: '2px solid var(--accent-gold)',
               }}
             >
               {customer.name?.charAt(0)}
@@ -170,13 +171,13 @@ export const CustomerDetailsPage = () => {
               <h2 style={{ fontSize: '1.65rem', fontWeight: 800, color: '#ffffff' }}>
                 {customer.name}
               </h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '6px', fontSize: '0.92rem', color: '#c7d2fe' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '6px', fontSize: '0.92rem', color: '#cbd5e1' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Phone size={15} /> {customer.mobileNumber}
+                  <Phone size={15} color="var(--accent-gold)" /> {customer.mobileNumber}
                 </span>
                 {customer.address && (
                   <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <MapPin size={15} /> {customer.address}
+                    <MapPin size={15} color="var(--accent-gold)" /> {customer.address}
                   </span>
                 )}
               </div>
@@ -184,8 +185,8 @@ export const CustomerDetailsPage = () => {
           </div>
 
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '0.82rem', color: '#c7d2fe' }}>Total Orders</div>
-            <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#fef08a' }}>
+            <div style={{ fontSize: '0.82rem', color: '#94a3b8' }}>Total Orders</div>
+            <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--accent-gold)' }}>
               {orders.length}
             </div>
           </div>
