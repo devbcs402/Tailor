@@ -83,7 +83,14 @@ export const Header = ({ onMenuClick, title, subtitle }) => {
       <style>{`
         @media (max-width: 900px) {
           .menu-toggle-btn {
-            display: block !important;
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            min-width: 42px;
+            min-height: 42px;
+            border-radius: 8px;
+            background: #f1f5f9 !important;
+            color: var(--primary) !important;
           }
           .header {
             padding: 0 16px !important;

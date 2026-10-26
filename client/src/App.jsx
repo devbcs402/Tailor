@@ -13,6 +13,7 @@ import { OrderDetailsPage } from './pages/OrderDetailsPage';
 import { CustomersPage } from './pages/CustomersPage';
 import { CustomerDetailsPage } from './pages/CustomerDetailsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { PatternSettingsPage } from './pages/PatternSettingsPage';
 
 export function App() {
   return (
@@ -33,6 +34,7 @@ export function App() {
                 <Route path="/customers" element={<CustomersPage />} />
                 <Route path="/customers/:id" element={<CustomerDetailsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/settings/patterns" element={<PatternSettingsPage />} />
               </Route>
             </Route>
 

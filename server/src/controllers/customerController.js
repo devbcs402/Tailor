@@ -114,10 +114,10 @@ export const createCustomer = async (req, res, next) => {
   try {
     const { name, mobileNumber, address, notes, latestMeasurements } = req.body;
 
-    if (!name || !name.trim()) {
+    if (!name || !name.trim() || name.trim().length < 2) {
       return res.status(400).json({
         success: false,
-        message: 'Customer name is required',
+        message: 'Valid customer name (at least 2 characters) is required',
       });
     }
 
@@ -128,7 +128,13 @@ export const createCustomer = async (req, res, next) => {
       });
     }
 
-    const cleanMobile = normalizeMobile(mobileNumber);
+    const cleanMobile = String(mobileNumber).replace(/\D/g, '').trim();
+    if (cleanMobile.length !== 10) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mobile number must be exactly 10 digits',
+      });
+    }
 
     // Check if customer already exists with this mobile number
     const existing = await Customer.findOne({ mobileNumber: cleanMobile });
@@ -173,9 +179,23 @@ export const updateCustomer = async (req, res, next) => {
       });
     }
 
-    if (name) customer.name = name.trim();
-    if (mobileNumber) {
-      const cleanMobile = normalizeMobile(mobileNumber);
+    if (name !== undefined) {
+      if (!name.trim() || name.trim().length < 2) {
+        return res.status(400).json({
+          success: false,
+          message: 'Valid customer name (at least 2 characters) is required',
+        });
+      }
+      customer.name = name.trim();
+    }
+    if (mobileNumber !== undefined) {
+      const cleanMobile = String(mobileNumber).replace(/\D/g, '').trim();
+      if (cleanMobile.length !== 10) {
+        return res.status(400).json({
+          success: false,
+          message: 'Mobile number must be exactly 10 digits',
+        });
+      }
       // Check collision
       const duplicate = await Customer.findOne({
         mobileNumber: cleanMobile,

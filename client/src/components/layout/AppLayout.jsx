@@ -7,6 +7,11 @@ export const AppLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
+  // Automatically close mobile sidebar drawer upon navigation
+  React.useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
   // Determine dynamic title based on current pathname
   const getPageMeta = () => {
     const path = location.pathname;
@@ -28,8 +33,11 @@ export const AppLayout = () => {
     if (path === '/customers') {
       return { title: 'Customers', subtitle: 'Customer directory, contact details, and measurement history' };
     }
+    if (path === '/settings/patterns') {
+      return { title: 'Pattern Settings', subtitle: 'Manage shirt patterns and pant patterns used in orders' };
+    }
     if (path === '/settings') {
-      return { title: 'Settings', subtitle: 'Manage shirt and pant patterns and application preferences' };
+      return { title: 'Settings', subtitle: 'Application preferences and studio settings' };
     }
     return { title: 'Silai Master', subtitle: 'Tailor Management System' };
   };

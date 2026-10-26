@@ -62,9 +62,42 @@ export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
       return;
     }
 
-    if ((parseInt(shirtQuantity, 10) || 0) === 0 && (parseInt(pantQuantity, 10) || 0) === 0) {
+    const sQty = parseInt(shirtQuantity, 10) || 0;
+    const pQty = parseInt(pantQuantity, 10) || 0;
+
+    if (sQty < 0 || pQty < 0) {
+      setValidationError('Garment quantities cannot be negative.');
+      return;
+    }
+
+    if (sQty === 0 && pQty === 0) {
       setValidationError('Please specify at least 1 shirt or 1 pant quantity.');
       return;
+    }
+
+    // Numeric measurement validations
+    if (sQty > 0) {
+      for (const [key, val] of Object.entries(shirtMeasurements)) {
+        if (key !== 'notes' && val) {
+          const num = parseFloat(val);
+          if (isNaN(num) || num <= 0) {
+            setValidationError(`Shirt measurement for "${key}" must be a valid positive number.`);
+            return;
+          }
+        }
+      }
+    }
+
+    if (pQty > 0) {
+      for (const [key, val] of Object.entries(pantMeasurements)) {
+        if (key !== 'notes' && val) {
+          const num = parseFloat(val);
+          if (isNaN(num) || num <= 0) {
+            setValidationError(`Pant measurement for "${key}" must be a valid positive number.`);
+            return;
+          }
+        }
+      }
     }
 
     setSubmitting(true);
@@ -74,18 +107,18 @@ export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
         deliveryTime,
         specialInstructions,
         shirt: {
-          quantity: parseInt(shirtQuantity, 10) || 0,
-          patterns: shirtPatterns,
-          pattern: shirtPatterns.join(', '),
-          customPattern: shirtCustomPattern,
-          measurements: shirtMeasurements,
+          quantity: sQty,
+          patterns: sQty > 0 ? shirtPatterns : [],
+          pattern: sQty > 0 ? shirtPatterns.join(', ') : '',
+          customPattern: sQty > 0 ? shirtCustomPattern : '',
+          measurements: sQty > 0 ? shirtMeasurements : {},
         },
         pant: {
-          quantity: parseInt(pantQuantity, 10) || 0,
-          patterns: pantPatterns,
-          pattern: pantPatterns.join(', '),
-          customPattern: pantCustomPattern,
-          measurements: pantMeasurements,
+          quantity: pQty,
+          patterns: pQty > 0 ? pantPatterns : [],
+          pattern: pQty > 0 ? pantPatterns.join(', ') : '',
+          customPattern: pQty > 0 ? pantCustomPattern : '',
+          measurements: pQty > 0 ? pantMeasurements : {},
         },
       };
 

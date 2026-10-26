@@ -133,28 +133,45 @@ export const createOrder = async (req, res, next) => {
       saveAsLatestMeasurements = false,
     } = req.body;
 
-    if (!deadline) {
+    if (!deadline || isNaN(new Date(deadline).getTime())) {
       return res.status(400).json({
         success: false,
-        message: 'Delivery deadline is required',
+        message: 'Valid delivery deadline is required',
       });
     }
 
     const parsedDeadline = new Date(deadline);
     const parsedOrderDate = orderDate ? new Date(orderDate) : new Date();
 
-    // Prepare patterns for shirt
-    const shirtPatternsList = Array.isArray(shirt.patterns)
-      ? shirt.patterns.filter(Boolean)
-      : (shirt.pattern ? [String(shirt.pattern).trim()] : []);
+    const shirtQty = Math.max(0, parseInt(shirt.quantity, 10) || 0);
+    const pantQty = Math.max(0, parseInt(pant.quantity, 10) || 0);
+
+    if (shirtQty < 0 || pantQty < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Garment quantities cannot be negative',
+      });
+    }
+
+    if (shirtQty === 0 && pantQty === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please specify at least 1 shirt or 1 pant quantity',
+      });
+    }
+
+    // Prepare patterns for shirt (only if shirtQty > 0)
+    const shirtPatternsList = shirtQty > 0
+      ? (Array.isArray(shirt.patterns) ? shirt.patterns.filter(Boolean) : (shirt.pattern ? [String(shirt.pattern).trim()] : []))
+      : [];
     const shirtPatternCombined = shirtPatternsList.length > 0
       ? shirtPatternsList.join(', ')
       : (shirt.pattern !== undefined ? String(shirt.pattern).trim() : '');
 
-    // Prepare patterns for pant
-    const pantPatternsList = Array.isArray(pant.patterns)
-      ? pant.patterns.filter(Boolean)
-      : (pant.pattern ? [String(pant.pattern).trim()] : []);
+    // Prepare patterns for pant (only if pantQty > 0)
+    const pantPatternsList = pantQty > 0
+      ? (Array.isArray(pant.patterns) ? pant.patterns.filter(Boolean) : (pant.pattern ? [String(pant.pattern).trim()] : []))
+      : [];
     const pantPatternCombined = pantPatternsList.length > 0
       ? pantPatternsList.join(', ')
       : (pant.pattern !== undefined ? String(pant.pattern).trim() : '');
@@ -164,10 +181,10 @@ export const createOrder = async (req, res, next) => {
     // Handle New vs Existing Customer
     if (isNewCustomer) {
       const { name, mobileNumber, address, notes } = customerDetails || {};
-      if (!name || !name.trim()) {
+      if (!name || !name.trim() || name.trim().length < 2) {
         return res.status(400).json({
           success: false,
-          message: 'Customer name is required',
+          message: 'Valid customer name (at least 2 characters) is required',
         });
       }
       if (!mobileNumber || !mobileNumber.trim()) {
@@ -177,7 +194,13 @@ export const createOrder = async (req, res, next) => {
         });
       }
 
-      const cleanMobile = String(mobileNumber).replace(/[^0-9+]/g, '').trim();
+      const cleanMobile = String(mobileNumber).replace(/\D/g, '').trim();
+      if (cleanMobile.length !== 10) {
+        return res.status(400).json({
+          success: false,
+          message: 'Mobile number must be exactly 10 digits',
+        });
+      }
 
       // Check existing mobile number
       let existing = await Customer.findOne({ mobileNumber: cleanMobile });
@@ -197,14 +220,14 @@ export const createOrder = async (req, res, next) => {
         notes: notes ? notes.trim() : '',
         latestMeasurements: {
           unit: measurementUnit,
-          shirt: shirt.measurements || {},
+          shirt: shirtQty > 0 ? (shirt.measurements || {}) : {},
           shirtPatterns: shirtPatternsList,
           shirtPattern: shirtPatternCombined,
-          shirtCustomPattern: shirt.customPattern || '',
-          pant: pant.measurements || {},
+          shirtCustomPattern: shirtQty > 0 ? (shirt.customPattern || '') : '',
+          pant: pantQty > 0 ? (pant.measurements || {}) : {},
           pantPatterns: pantPatternsList,
           pantPattern: pantPatternCombined,
-          pantCustomPattern: pant.customPattern || '',
+          pantCustomPattern: pantQty > 0 ? (pant.customPattern || '') : '',
           updatedAt: new Date(),
         },
       });
@@ -226,18 +249,20 @@ export const createOrder = async (req, res, next) => {
         });
       }
 
-      // If tailor explicitly asked to update latest measurements
+      // If tailor asked to update latest measurements
+      // Safeguard: Do not overwrite garment measurements if quantity is 0!
       if (saveAsLatestMeasurements) {
+        const existingLm = targetCustomer.latestMeasurements || {};
         targetCustomer.latestMeasurements = {
-          unit: measurementUnit,
-          shirt: shirt.measurements || {},
-          shirtPatterns: shirtPatternsList,
-          shirtPattern: shirtPatternCombined,
-          shirtCustomPattern: shirt.customPattern || '',
-          pant: pant.measurements || {},
-          pantPatterns: pantPatternsList,
-          pantPattern: pantPatternCombined,
-          pantCustomPattern: pant.customPattern || '',
+          unit: measurementUnit || existingLm.unit || 'inch',
+          shirt: shirtQty > 0 ? (shirt.measurements || {}) : (existingLm.shirt || {}),
+          shirtPatterns: shirtQty > 0 ? shirtPatternsList : (existingLm.shirtPatterns || []),
+          shirtPattern: shirtQty > 0 ? shirtPatternCombined : (existingLm.shirtPattern || ''),
+          shirtCustomPattern: shirtQty > 0 ? (shirt.customPattern || '') : (existingLm.shirtCustomPattern || ''),
+          pant: pantQty > 0 ? (pant.measurements || {}) : (existingLm.pant || {}),
+          pantPatterns: pantQty > 0 ? pantPatternsList : (existingLm.pantPatterns || []),
+          pantPattern: pantQty > 0 ? pantPatternCombined : (existingLm.pantPattern || ''),
+          pantCustomPattern: pantQty > 0 ? (pant.customPattern || '') : (existingLm.pantCustomPattern || ''),
           updatedAt: new Date(),
         };
         await targetCustomer.save();
@@ -246,9 +271,6 @@ export const createOrder = async (req, res, next) => {
 
     // Collision-safe atomic sequence order number
     let orderNumber = await generateNextOrderNumber();
-
-    const shirtQty = Math.max(0, parseInt(shirt.quantity, 10) || 0);
-    const pantQty = Math.max(0, parseInt(pant.quantity, 10) || 0);
 
     const newOrder = new Order({
       orderNumber,
@@ -265,17 +287,17 @@ export const createOrder = async (req, res, next) => {
       measurementUnit,
       shirt: {
         quantity: shirtQty,
-        patterns: shirtPatternsList,
-        pattern: shirtPatternCombined,
-        customPattern: shirt.customPattern || '',
-        measurements: shirt.measurements || {},
+        patterns: shirtQty > 0 ? shirtPatternsList : [],
+        pattern: shirtQty > 0 ? shirtPatternCombined : '',
+        customPattern: shirtQty > 0 ? (shirt.customPattern || '') : '',
+        measurements: shirtQty > 0 ? (shirt.measurements || {}) : {},
       },
       pant: {
         quantity: pantQty,
-        patterns: pantPatternsList,
-        pattern: pantPatternCombined,
-        customPattern: pant.customPattern || '',
-        measurements: pant.measurements || {},
+        patterns: pantQty > 0 ? pantPatternsList : [],
+        pattern: pantQty > 0 ? pantPatternCombined : '',
+        customPattern: pantQty > 0 ? (pant.customPattern || '') : '',
+        measurements: pantQty > 0 ? (pant.measurements || {}) : {},
       },
       specialInstructions: specialInstructions ? specialInstructions.trim() : '',
       pricing: {
@@ -320,57 +342,111 @@ export const updateOrder = async (req, res, next) => {
       });
     }
 
-    if (deadline) order.deadline = new Date(deadline);
+    if (deadline) {
+      if (isNaN(new Date(deadline).getTime())) {
+        return res.status(400).json({ success: false, message: 'Valid deadline is required' });
+      }
+      order.deadline = new Date(deadline);
+    }
     if (deliveryTime !== undefined) order.deliveryTime = deliveryTime;
-    if (status && ['in_progress', 'ready', 'delivered', 'cancelled'].includes(status)) {
-      order.status = status;
+    if (status) {
+      if (status === 'pending') {
+        return res.status(400).json({
+          success: false,
+          message: 'Status cannot be updated to pending',
+        });
+      }
+      if (['in_progress', 'ready', 'delivered', 'cancelled'].includes(status)) {
+        order.status = status;
+      }
     }
     if (measurementUnit) order.measurementUnit = measurementUnit;
 
     if (shirt) {
       const existingShirt = order.shirt ? order.shirt.toObject() : {};
-      const updatedPatterns = shirt.patterns !== undefined
-        ? (Array.isArray(shirt.patterns) ? shirt.patterns.filter(Boolean) : [])
-        : (existingShirt.patterns || []);
-      const updatedCustom = shirt.customPattern !== undefined
-        ? shirt.customPattern
-        : (existingShirt.customPattern || '');
-      const updatedPatternStr = shirt.pattern !== undefined
-        ? String(shirt.pattern).trim()
-        : (updatedPatterns.length > 0 ? updatedPatterns.join(', ') : (existingShirt.pattern || ''));
+      const sQty = shirt.quantity !== undefined
+        ? Math.max(0, parseInt(shirt.quantity, 10) || 0)
+        : (existingShirt.quantity || 0);
 
-      order.shirt = {
-        ...existingShirt,
-        ...shirt,
-        patterns: updatedPatterns,
-        customPattern: updatedCustom,
-        pattern: updatedPatternStr,
-      };
+      if (sQty === 0) {
+        order.shirt = {
+          ...existingShirt,
+          quantity: 0,
+          patterns: [],
+          pattern: '',
+          customPattern: '',
+          measurements: {},
+        };
+      } else {
+        const updatedPatterns = shirt.patterns !== undefined
+          ? (Array.isArray(shirt.patterns) ? shirt.patterns.filter(Boolean) : [])
+          : (existingShirt.patterns || []);
+        const updatedCustom = shirt.customPattern !== undefined
+          ? shirt.customPattern
+          : (existingShirt.customPattern || '');
+        const updatedPatternStr = shirt.pattern !== undefined
+          ? String(shirt.pattern).trim()
+          : (updatedPatterns.length > 0 ? updatedPatterns.join(', ') : (existingShirt.pattern || ''));
+
+        order.shirt = {
+          ...existingShirt,
+          ...shirt,
+          quantity: sQty,
+          patterns: updatedPatterns,
+          customPattern: updatedCustom,
+          pattern: updatedPatternStr,
+          measurements: shirt.measurements !== undefined ? shirt.measurements : (existingShirt.measurements || {}),
+        };
+      }
     }
 
     if (pant) {
       const existingPant = order.pant ? order.pant.toObject() : {};
-      const updatedPatterns = pant.patterns !== undefined
-        ? (Array.isArray(pant.patterns) ? pant.patterns.filter(Boolean) : [])
-        : (existingPant.patterns || []);
-      const updatedCustom = pant.customPattern !== undefined
-        ? pant.customPattern
-        : (existingPant.customPattern || '');
-      const updatedPatternStr = pant.pattern !== undefined
-        ? String(pant.pattern).trim()
-        : (updatedPatterns.length > 0 ? updatedPatterns.join(', ') : (existingPant.pattern || ''));
+      const pQty = pant.quantity !== undefined
+        ? Math.max(0, parseInt(pant.quantity, 10) || 0)
+        : (existingPant.quantity || 0);
 
-      order.pant = {
-        ...existingPant,
-        ...pant,
-        patterns: updatedPatterns,
-        customPattern: updatedCustom,
-        pattern: updatedPatternStr,
-      };
+      if (pQty === 0) {
+        order.pant = {
+          ...existingPant,
+          quantity: 0,
+          patterns: [],
+          pattern: '',
+          customPattern: '',
+          measurements: {},
+        };
+      } else {
+        const updatedPatterns = pant.patterns !== undefined
+          ? (Array.isArray(pant.patterns) ? pant.patterns.filter(Boolean) : [])
+          : (existingPant.patterns || []);
+        const updatedCustom = pant.customPattern !== undefined
+          ? pant.customPattern
+          : (existingPant.customPattern || '');
+        const updatedPatternStr = pant.pattern !== undefined
+          ? String(pant.pattern).trim()
+          : (updatedPatterns.length > 0 ? updatedPatterns.join(', ') : (existingPant.pattern || ''));
+
+        order.pant = {
+          ...existingPant,
+          ...pant,
+          quantity: pQty,
+          patterns: updatedPatterns,
+          customPattern: updatedCustom,
+          pattern: updatedPatternStr,
+          measurements: pant.measurements !== undefined ? pant.measurements : (existingPant.measurements || {}),
+        };
+      }
+    }
+
+    if ((order.shirt?.quantity || 0) === 0 && (order.pant?.quantity || 0) === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Order must contain at least 1 shirt or 1 pant',
+      });
     }
 
     if (specialInstructions !== undefined) {
-      order.specialInstructions = specialInstructions;
+      order.specialInstructions = specialInstructions ? specialInstructions.trim() : '';
     }
 
     await order.save();

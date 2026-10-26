@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   PlusCircle,
@@ -15,6 +15,7 @@ import { useAuth } from '../../context/AuthContext';
 export const Sidebar = ({ isOpen, onClose }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = async () => {
     await logout();
@@ -38,9 +39,10 @@ export const Sidebar = ({ isOpen, onClose }) => {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(15, 23, 42, 0.6)',
-            backdropFilter: 'blur(3px)',
-            zIndex: 40,
+            background: 'rgba(11, 31, 58, 0.65)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 1040,
+            transition: 'opacity 0.25s ease',
           }}
         />
       )}
@@ -48,6 +50,8 @@ export const Sidebar = ({ isOpen, onClose }) => {
       <aside
         style={{
           width: 'var(--sidebar-width)',
+          minWidth: 'var(--sidebar-width)',
+          flexShrink: 0,
           backgroundColor: 'var(--bg-sidebar)',
           color: 'var(--text-on-dark)',
           display: 'flex',
@@ -56,7 +60,9 @@ export const Sidebar = ({ isOpen, onClose }) => {
           top: 0,
           height: '100vh',
           zIndex: 50,
-          transition: 'transform 0.3s ease',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           boxShadow: '4px 0 20px rgba(0, 0, 0, 0.1)',
         }}
         className={`sidebar ${isOpen ? 'open' : ''}`}
@@ -129,13 +135,19 @@ export const Sidebar = ({ isOpen, onClose }) => {
 
           {navItems.map((item) => {
             const Icon = item.icon;
+            const isItemActive = item.to === '/'
+              ? location.pathname === '/'
+              : item.to === '/settings'
+              ? location.pathname.startsWith('/settings')
+              : location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
+
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.to === '/'}
                 onClick={onClose}
-                style={({ isActive }) => ({
+                style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '14px',
@@ -143,16 +155,17 @@ export const Sidebar = ({ isOpen, onClose }) => {
                   borderRadius: '10px',
                   textDecoration: 'none',
                   fontSize: '0.94rem',
-                  fontWeight: isActive ? 700 : 500,
-                  color: isActive ? '#d4af37' : '#94a3b8',
-                  backgroundColor: isActive ? 'var(--bg-sidebar-hover)' : 'transparent',
-                  borderLeft: isActive ? '4px solid #d4af37' : '4px solid transparent',
+                  fontWeight: isItemActive ? 700 : 500,
+                  color: isItemActive ? '#d4af37' : '#cbd5e1',
+                  backgroundColor: isItemActive ? 'var(--bg-sidebar-hover)' : 'transparent',
+                  borderLeft: isItemActive ? '4px solid #d4af37' : '4px solid transparent',
                   transition: 'all 0.2s ease',
-                  boxShadow: isActive ? '0 2px 10px rgba(0, 0, 0, 0.2)' : 'none',
-                })}
+                  boxShadow: isItemActive ? '0 2px 10px rgba(0, 0, 0, 0.25)' : 'none',
+                  whiteSpace: 'nowrap',
+                }}
               >
                 <Icon size={20} color="currentColor" />
-                <span style={{ fontSize: '0.94rem' }}>{item.label}</span>
+                <span style={{ fontSize: '0.94rem', whiteSpace: 'nowrap' }}>{item.label}</span>
               </NavLink>
             );
           })}
@@ -180,6 +193,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
                 fontWeight: 700,
                 fontSize: '0.9rem',
                 border: '1.5px solid #d4af37',
+                flexShrink: 0,
               }}
             >
               {user?.name ? user.name.charAt(0) : 'T'}
@@ -235,17 +249,28 @@ export const Sidebar = ({ isOpen, onClose }) => {
         <style>{`
           @media (max-width: 900px) {
             .sidebar {
-              position: fixed;
-              left: 0;
-              top: 0;
-              bottom: 0;
+              position: fixed !important;
+              left: 0 !important;
+              top: 0 !important;
+              bottom: 0 !important;
+              height: 100vh !important;
+              max-height: 100vh !important;
+              z-index: 1050 !important;
               transform: translateX(-100%);
+              box-shadow: 8px 0 32px rgba(0, 0, 0, 0.4) !important;
             }
             .sidebar.open {
-              transform: translateX(0);
+              transform: translateX(0) !important;
             }
             .mobile-close-btn {
-              display: block !important;
+              display: flex !important;
+              align-items: center;
+              justify-content: center;
+              width: 36px;
+              height: 36px;
+              border-radius: 8px;
+              background: rgba(255, 255, 255, 0.1) !important;
+              color: #ffffff !important;
             }
           }
         `}</style>

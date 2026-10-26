@@ -39,23 +39,32 @@ export const CustomerModal = ({ isOpen, onClose, customerToEdit, onSaved }) => {
     e.preventDefault();
     setError('');
 
-    if (!formData.name.trim()) {
-      setError('Customer name is required');
+    const cleanName = formData.name.trim();
+    if (!cleanName || cleanName.length < 2) {
+      setError('Please enter a valid customer name (at least 2 characters)');
       return;
     }
-    if (!formData.mobileNumber.trim()) {
-      setError('Mobile number is required');
+
+    const digitsOnly = formData.mobileNumber.replace(/\D/g, '');
+    if (!formData.mobileNumber.trim() || digitsOnly.length !== 10) {
+      setError('Please enter a valid 10-digit mobile number');
       return;
     }
+
+    const sanitizedData = {
+      ...formData,
+      name: cleanName,
+      mobileNumber: digitsOnly,
+    };
 
     setLoading(true);
     try {
       if (customerToEdit) {
-        const res = await customersApi.updateCustomer(customerToEdit._id, formData);
+        const res = await customersApi.updateCustomer(customerToEdit._id, sanitizedData);
         success('Customer details updated');
         onSaved(res.data);
       } else {
-        const res = await customersApi.createCustomer(formData);
+        const res = await customersApi.createCustomer(sanitizedData);
         success('New customer created');
         onSaved(res.data);
       }
