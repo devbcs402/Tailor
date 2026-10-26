@@ -1,0 +1,602 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "system": "Tailor Management System (Silai Master)",
+    "createdAt": "2026-10-26T10:16:09.905Z",
+    "triggeredBy": "cron_7_days",
+    "note": "Automated 7-day recurring backup job",
+    "stats": {
+      "users": 1,
+      "customers": 4,
+      "orders": 7,
+      "orderCounters": 1,
+      "totalRecords": 13
+    }
+  },
+  "data": {
+    "users": [
+      {
+        "_id": "6adedad7084a6fd067c296c8",
+        "name": "Yash Tailor (Master Tailor)",
+        "email": "admin@tailor.com",
+        "passwordHash": "$2a$10$4HgS/dbfDq4WFl3VhFGhcOcrPAbpTUjGRxYifR5OT6PXPhpwtgHyi",
+        "role": "admin",
+        "shopName": "Silai Master Tailor Studio",
+        "createdAt": "2026-10-26T04:45:11.016Z",
+        "updatedAt": "2026-10-26T05:15:23.507Z",
+        "__v": 0
+      }
+    ],
+    "customers": [
+      {
+        "_id": "6adee1ebb0a67b9dfeb62917",
+        "name": "Ramesh Patel",
+        "mobileNumber": "9876543210",
+        "address": "12, Sardar Chowk, Navrangpura, Ahmedabad",
+        "notes": "Regular customer, prefers slim fit trousers",
+        "latestMeasurements": {
+          "unit": "inch",
+          "shirt": {
+            "length": "28.5",
+            "chest": "40",
+            "waist": "36",
+            "shoulder": "18",
+            "sleeveLength": "24",
+            "sleeveOpening": "9.5",
+            "neck": "15.5",
+            "frontChest": "19.5",
+            "notes": "Use stiff buckram in collar"
+          },
+          "shirtPattern": "checks",
+          "shirtCustomPattern": "",
+          "pant": {
+            "length": "39",
+            "waist": "34",
+            "hip": "40",
+            "thigh": "23",
+            "knee": "16",
+            "bottomOpening": "14.5",
+            "crotchRise": "10.5",
+            "notes": "Cross pocket and one back pocket"
+          },
+          "pantPattern": "formal_pant",
+          "pantCustomPattern": "",
+          "updatedAt": "2026-10-26T05:15:23.889Z"
+        },
+        "isActive": true,
+        "createdAt": "2026-10-26T05:15:23.896Z",
+        "updatedAt": "2026-10-26T05:15:23.896Z",
+        "__v": 0
+      },
+      {
+        "_id": "6adee1ebb0a67b9dfeb62918",
+        "name": "Hitesh Shah",
+        "mobileNumber": "9825012345",
+        "address": "45, Mahavir Society, Paldi, Ahmedabad",
+        "notes": "Likes Kurta collar and loose comfortable fitting",
+        "latestMeasurements": {
+          "unit": "inch",
+          "shirt": {
+            "length": "29",
+            "chest": "41",
+            "waist": "37",
+            "shoulder": "18.5",
+            "sleeveLength": "24",
+            "sleeveOpening": "9.5",
+            "neck": "16",
+            "frontChest": "20",
+            "notes": "Buckram in collar"
+          },
+          "shirtPattern": "checks",
+          "shirtCustomPattern": "",
+          "pant": {
+            "length": "39.5",
+            "waist": "34",
+            "hip": "40",
+            "thigh": "23",
+            "knee": "16",
+            "bottomOpening": "14.5",
+            "crotchRise": "10.5",
+            "notes": ""
+          },
+          "pantPattern": "formal_pant",
+          "pantCustomPattern": "",
+          "updatedAt": "2026-10-26T05:27:25.447Z"
+        },
+        "isActive": true,
+        "createdAt": "2026-10-26T05:15:23.897Z",
+        "updatedAt": "2026-10-26T05:27:25.449Z",
+        "__v": 0
+      },
+      {
+        "_id": "6adee1ebb0a67b9dfeb62919",
+        "name": "Vijay Panchal",
+        "mobileNumber": "9428098765",
+        "address": "8, Vishwakarma Nagar, Maninagar, Ahmedabad",
+        "notes": "Jeans style cutting with double stitching",
+        "latestMeasurements": {
+          "unit": "inch",
+          "shirt": {
+            "length": "27.5",
+            "chest": "38",
+            "waist": "32",
+            "shoulder": "17.5",
+            "sleeveLength": "23.5",
+            "sleeveOpening": "9",
+            "neck": "15",
+            "frontChest": "18.5",
+            "notes": ""
+          },
+          "shirtPattern": "striped",
+          "shirtCustomPattern": "",
+          "pant": {
+            "length": "38.5",
+            "waist": "32",
+            "hip": "38",
+            "thigh": "22",
+            "knee": "15.5",
+            "bottomOpening": "13.5",
+            "crotchRise": "10",
+            "notes": "Jeans style with coin pocket"
+          },
+          "pantPattern": "jeans_style",
+          "pantCustomPattern": "",
+          "updatedAt": "2026-10-26T05:15:23.889Z"
+        },
+        "isActive": true,
+        "createdAt": "2026-10-26T05:15:23.897Z",
+        "updatedAt": "2026-10-26T05:15:23.897Z",
+        "__v": 0
+      },
+      {
+        "_id": "6adee1ebb0a67b9dfeb6291a",
+        "name": "Bhavesh Soni",
+        "mobileNumber": "9909011223",
+        "address": "24, Soni Bazar, Raipur, Ahmedabad",
+        "notes": "",
+        "latestMeasurements": {
+          "unit": "inch",
+          "shirt": {
+            "length": "29",
+            "chest": "41",
+            "waist": "37",
+            "shoulder": "18.5",
+            "sleeveLength": "24",
+            "sleeveOpening": "9.5",
+            "neck": "16",
+            "frontChest": "20",
+            "notes": ""
+          },
+          "shirtPattern": "printed",
+          "shirtCustomPattern": "",
+          "pant": {
+            "length": "39.5",
+            "waist": "35",
+            "hip": "41",
+            "thigh": "23.5",
+            "knee": "16.5",
+            "bottomOpening": "14",
+            "crotchRise": "10.5",
+            "notes": ""
+          },
+          "pantPattern": "pencil_fit",
+          "pantCustomPattern": "",
+          "updatedAt": "2026-10-26T05:15:23.889Z"
+        },
+        "isActive": true,
+        "createdAt": "2026-10-26T05:15:23.897Z",
+        "updatedAt": "2026-10-26T05:15:23.897Z",
+        "__v": 0
+      }
+    ],
+    "orders": [
+      {
+        "_id": "6adee1ebb0a67b9dfeb6291c",
+        "orderNumber": "ORD-2026-00001",
+        "customer": "6adee1ebb0a67b9dfeb62917",
+        "customerSnapshot": {
+          "name": "Ramesh Patel",
+          "mobileNumber": "9876543210",
+          "address": "12, Sardar Chowk, Navrangpura, Ahmedabad"
+        },
+        "orderDate": "2026-10-25T05:15:23.955Z",
+        "deadline": "2026-10-26T05:15:23.955Z",
+        "deliveryTime": "Evening 6:00 PM",
+        "status": "ready",
+        "measurementUnit": "inch",
+        "shirt": {
+          "quantity": 2,
+          "pattern": "checks",
+          "customPattern": "",
+          "measurements": {
+            "length": "28.5",
+            "chest": "40",
+            "waist": "36",
+            "shoulder": "18",
+            "sleeveLength": "24",
+            "sleeveOpening": "9.5",
+            "neck": "15.5",
+            "frontChest": "19.5",
+            "notes": "Use stiff buckram in collar"
+          }
+        },
+        "pant": {
+          "quantity": 2,
+          "pattern": "formal_pant",
+          "customPattern": "",
+          "measurements": {
+            "length": "39",
+            "waist": "34",
+            "hip": "40",
+            "thigh": "23",
+            "knee": "16",
+            "bottomOpening": "14.5",
+            "crotchRise": "10.5",
+            "notes": "Cross pocket and one back pocket"
+          }
+        },
+        "specialInstructions": "For wedding ceremony, put monogram \"RP\" on cuff",
+        "pricing": {
+          "shirtPrice": 450,
+          "pantPrice": 550,
+          "total": 2000,
+          "advancePaid": 1000,
+          "balanceDue": 1000
+        },
+        "createdAt": "2026-10-26T05:15:23.973Z",
+        "updatedAt": "2026-10-26T05:28:17.239Z",
+        "__v": 0
+      },
+      {
+        "_id": "6adee1ebb0a67b9dfeb6291d",
+        "orderNumber": "ORD-2026-00002",
+        "customer": "6adee1ebb0a67b9dfeb62918",
+        "customerSnapshot": {
+          "name": "Hitesh Shah",
+          "mobileNumber": "9825012345",
+          "address": "45, Mahavir Society, Paldi, Ahmedabad"
+        },
+        "orderDate": "2026-10-26T05:15:23.955Z",
+        "deadline": "2026-10-27T05:15:23.955Z",
+        "deliveryTime": "Afternoon 12:00 PM",
+        "status": "in_progress",
+        "measurementUnit": "inch",
+        "shirt": {
+          "quantity": 1,
+          "pattern": "plain",
+          "customPattern": "",
+          "measurements": {
+            "length": "30",
+            "chest": "42",
+            "waist": "38",
+            "shoulder": "19",
+            "sleeveLength": "24.5",
+            "sleeveOpening": "10",
+            "neck": "16",
+            "frontChest": "20",
+            "notes": "Plain white buttons"
+          }
+        },
+        "pant": {
+          "quantity": 1,
+          "pattern": "pleated",
+          "customPattern": "",
+          "measurements": {
+            "length": "40",
+            "waist": "36",
+            "hip": "42",
+            "thigh": "24",
+            "knee": "17",
+            "bottomOpening": "15",
+            "crotchRise": "11",
+            "notes": "Pleated trousers"
+          }
+        },
+        "specialInstructions": "Keep Kurta style collar",
+        "pricing": {
+          "shirtPrice": 400,
+          "pantPrice": 500,
+          "total": 900,
+          "advancePaid": 500,
+          "balanceDue": 400
+        },
+        "createdAt": "2026-10-26T05:15:23.974Z",
+        "updatedAt": "2026-10-26T05:15:23.974Z",
+        "__v": 0
+      },
+      {
+        "_id": "6adee1ebb0a67b9dfeb6291e",
+        "orderNumber": "ORD-2026-00003",
+        "customer": "6adee1ebb0a67b9dfeb62919",
+        "customerSnapshot": {
+          "name": "Vijay Panchal",
+          "mobileNumber": "9428098765",
+          "address": "8, Vishwakarma Nagar, Maninagar, Ahmedabad"
+        },
+        "orderDate": "2026-10-25T05:15:23.955Z",
+        "deadline": "2026-10-29T05:15:23.955Z",
+        "deliveryTime": "Evening 5:00 PM",
+        "status": "pending",
+        "measurementUnit": "inch",
+        "shirt": {
+          "quantity": 1,
+          "pattern": "striped",
+          "customPattern": "",
+          "measurements": {
+            "length": "27.5",
+            "chest": "38",
+            "waist": "32",
+            "shoulder": "17.5",
+            "sleeveLength": "23.5",
+            "sleeveOpening": "9",
+            "neck": "15",
+            "frontChest": "18.5",
+            "notes": ""
+          }
+        },
+        "pant": {
+          "quantity": 2,
+          "pattern": "jeans_style",
+          "customPattern": "",
+          "measurements": {
+            "length": "38.5",
+            "waist": "32",
+            "hip": "38",
+            "thigh": "22",
+            "knee": "15.5",
+            "bottomOpening": "13.5",
+            "crotchRise": "10",
+            "notes": "Jeans style with coin pocket"
+          }
+        },
+        "specialInstructions": "Double stitching and orange thread",
+        "pricing": {
+          "shirtPrice": 450,
+          "pantPrice": 600,
+          "total": 1650,
+          "advancePaid": 1650,
+          "balanceDue": 0
+        },
+        "createdAt": "2026-10-26T05:15:23.974Z",
+        "updatedAt": "2026-10-26T05:15:23.974Z",
+        "__v": 0
+      },
+      {
+        "_id": "6adee1ebb0a67b9dfeb6291f",
+        "orderNumber": "ORD-2026-00004",
+        "customer": "6adee1ebb0a67b9dfeb6291a",
+        "customerSnapshot": {
+          "name": "Bhavesh Soni",
+          "mobileNumber": "9909011223",
+          "address": "24, Soni Bazar, Raipur, Ahmedabad"
+        },
+        "orderDate": "2026-10-21T05:15:23.956Z",
+        "deadline": "2026-10-24T05:15:23.956Z",
+        "deliveryTime": "Evening 7:00 PM",
+        "status": "delivered",
+        "measurementUnit": "inch",
+        "shirt": {
+          "quantity": 1,
+          "pattern": "printed",
+          "customPattern": "",
+          "measurements": {
+            "length": "29",
+            "chest": "41",
+            "waist": "37",
+            "shoulder": "18.5",
+            "sleeveLength": "24",
+            "sleeveOpening": "9.5",
+            "neck": "16",
+            "frontChest": "20",
+            "notes": ""
+          }
+        },
+        "pant": {
+          "quantity": 1,
+          "pattern": "pencil_fit",
+          "customPattern": "",
+          "measurements": {
+            "length": "39.5",
+            "waist": "35",
+            "hip": "41",
+            "thigh": "23.5",
+            "knee": "16.5",
+            "bottomOpening": "14",
+            "crotchRise": "10.5",
+            "notes": ""
+          }
+        },
+        "specialInstructions": "Delivered successfully, full payment received",
+        "pricing": {
+          "shirtPrice": 500,
+          "pantPrice": 550,
+          "total": 1050,
+          "advancePaid": 1050,
+          "balanceDue": 0
+        },
+        "createdAt": "2026-10-26T05:15:23.974Z",
+        "updatedAt": "2026-10-26T05:15:23.974Z",
+        "__v": 0
+      },
+      {
+        "_id": "6adee433ad1d1d36c6df4568",
+        "orderNumber": "ORD-2026-00005",
+        "customer": "6adee1ebb0a67b9dfeb62918",
+        "customerSnapshot": {
+          "name": "Hitesh Shah",
+          "mobileNumber": "9825012345",
+          "address": "45, Mahavir Society, Paldi, Ahmedabad"
+        },
+        "orderDate": "2026-10-26T05:25:07.844Z",
+        "deadline": "2026-10-29T05:25:07.841Z",
+        "deliveryTime": "Evening 7:00 PM",
+        "status": "in_progress",
+        "measurementUnit": "inch",
+        "shirt": {
+          "quantity": 2,
+          "pattern": "checks",
+          "customPattern": "",
+          "measurements": {
+            "length": "29",
+            "chest": "41",
+            "waist": "37",
+            "shoulder": "18.5",
+            "sleeveLength": "24",
+            "sleeveOpening": "9.5",
+            "neck": "16",
+            "frontChest": "20",
+            "notes": "Buckram in collar"
+          }
+        },
+        "pant": {
+          "quantity": 1,
+          "pattern": "formal_pant",
+          "customPattern": "",
+          "measurements": {
+            "length": "39.5",
+            "waist": "34",
+            "hip": "40",
+            "thigh": "23",
+            "knee": "16",
+            "bottomOpening": "14.5",
+            "crotchRise": "10.5",
+            "notes": ""
+          }
+        },
+        "specialInstructions": "Special fitting for wedding event",
+        "pricing": {
+          "shirtPrice": 450,
+          "pantPrice": 550,
+          "total": 1450,
+          "advancePaid": 500,
+          "balanceDue": 950
+        },
+        "createdAt": "2026-10-26T05:25:07.879Z",
+        "updatedAt": "2026-10-26T05:25:07.905Z",
+        "__v": 0
+      },
+      {
+        "_id": "6adee449f1741bf284122fa3",
+        "orderNumber": "ORD-2026-00006",
+        "customer": "6adee1ebb0a67b9dfeb62918",
+        "customerSnapshot": {
+          "name": "Hitesh Shah",
+          "mobileNumber": "9825012345",
+          "address": "45, Mahavir Society, Paldi, Ahmedabad"
+        },
+        "orderDate": "2026-10-26T05:25:29.763Z",
+        "deadline": "2026-10-29T05:25:29.759Z",
+        "deliveryTime": "Evening 7:00 PM",
+        "status": "in_progress",
+        "measurementUnit": "inch",
+        "shirt": {
+          "quantity": 2,
+          "pattern": "checks",
+          "customPattern": "",
+          "measurements": {
+            "length": "29",
+            "chest": "41",
+            "waist": "37",
+            "shoulder": "18.5",
+            "sleeveLength": "24",
+            "sleeveOpening": "9.5",
+            "neck": "16",
+            "frontChest": "20",
+            "notes": "Buckram in collar"
+          }
+        },
+        "pant": {
+          "quantity": 1,
+          "pattern": "formal_pant",
+          "customPattern": "",
+          "measurements": {
+            "length": "39.5",
+            "waist": "34",
+            "hip": "40",
+            "thigh": "23",
+            "knee": "16",
+            "bottomOpening": "14.5",
+            "crotchRise": "10.5",
+            "notes": ""
+          }
+        },
+        "specialInstructions": "Special fitting for wedding event",
+        "pricing": {
+          "shirtPrice": 450,
+          "pantPrice": 550,
+          "total": 1450,
+          "advancePaid": 500,
+          "balanceDue": 950
+        },
+        "createdAt": "2026-10-26T05:25:29.826Z",
+        "updatedAt": "2026-10-26T05:25:29.866Z",
+        "__v": 0
+      },
+      {
+        "_id": "6adee497f1741bf284122fdb",
+        "orderNumber": "ORD-2026-00007",
+        "customer": "6adee1ebb0a67b9dfeb62919",
+        "customerSnapshot": {
+          "name": "Vijay Panchal",
+          "mobileNumber": "9428098765",
+          "address": "8, Vishwakarma Nagar, Maninagar, Ahmedabad"
+        },
+        "orderDate": "2026-10-26T00:00:00.000Z",
+        "deadline": "2026-10-31T00:00:00.000Z",
+        "deliveryTime": "Evening 6:00 PM",
+        "status": "pending",
+        "measurementUnit": "inch",
+        "shirt": {
+          "quantity": 1,
+          "pattern": "striped",
+          "customPattern": "",
+          "measurements": {
+            "length": "27.5",
+            "chest": "38",
+            "waist": "32",
+            "shoulder": "17.5",
+            "sleeveLength": "23.5",
+            "sleeveOpening": "9",
+            "neck": "15",
+            "frontChest": "18.5",
+            "notes": ""
+          }
+        },
+        "pant": {
+          "quantity": 1,
+          "pattern": "formal_pant",
+          "customPattern": "",
+          "measurements": {
+            "length": "38.5",
+            "waist": "32",
+            "hip": "38",
+            "thigh": "22",
+            "knee": "15.5",
+            "bottomOpening": "13.5",
+            "crotchRise": "10",
+            "notes": "Jeans style with coin pocket"
+          }
+        },
+        "specialInstructions": "",
+        "pricing": {
+          "shirtPrice": 450,
+          "pantPrice": 550,
+          "total": 1000,
+          "advancePaid": 0,
+          "balanceDue": 1000
+        },
+        "createdAt": "2026-10-26T05:26:47.146Z",
+        "updatedAt": "2026-10-26T05:26:47.146Z",
+        "__v": 0
+      }
+    ],
+    "orderCounters": [
+      {
+        "_id": "6adee1ec18bb5b421389cc05",
+        "name": "order_seq_2026",
+        "seq": 7,
+        "__v": 0
+      }
+    ]
+  }
+}
