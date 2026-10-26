@@ -3,7 +3,18 @@ import { X, User, Save } from 'lucide-react';
 import { customersApi } from '../../api/customersApi';
 import { useToast } from '../../context/ToastContext';
 
-export const CustomerModal = ({ isOpen, onClose, customerToEdit, onSaved }) => {
+export const CustomerModal = ({
+  isOpen,
+  onClose,
+  customerToEdit,
+  customer,
+  onSaved,
+  onSuccess,
+}) => {
+  const activeCustomer = customerToEdit || customer || null;
+  const isEditMode = Boolean(activeCustomer && activeCustomer._id);
+  const handleSuccess = onSaved || onSuccess;
+
   const [formData, setFormData] = useState({
     name: '',
     mobileNumber: '',
@@ -15,12 +26,12 @@ export const CustomerModal = ({ isOpen, onClose, customerToEdit, onSaved }) => {
   const { success } = useToast();
 
   useEffect(() => {
-    if (customerToEdit) {
+    if (activeCustomer) {
       setFormData({
-        name: customerToEdit.name || '',
-        mobileNumber: customerToEdit.mobileNumber || '',
-        address: customerToEdit.address || '',
-        notes: customerToEdit.notes || '',
+        name: activeCustomer.name || '',
+        mobileNumber: activeCustomer.mobileNumber || '',
+        address: activeCustomer.address || '',
+        notes: activeCustomer.notes || '',
       });
     } else {
       setFormData({
@@ -31,7 +42,7 @@ export const CustomerModal = ({ isOpen, onClose, customerToEdit, onSaved }) => {
       });
     }
     setError('');
-  }, [customerToEdit, isOpen]);
+  }, [activeCustomer, isOpen]);
 
   if (!isOpen) return null;
 
@@ -52,25 +63,26 @@ export const CustomerModal = ({ isOpen, onClose, customerToEdit, onSaved }) => {
     }
 
     const sanitizedData = {
-      ...formData,
       name: cleanName,
       mobileNumber: digitsOnly,
+      address: formData.address ? formData.address.trim() : '',
+      notes: formData.notes ? formData.notes.trim() : '',
     };
 
     setLoading(true);
     try {
-      if (customerToEdit) {
-        const res = await customersApi.updateCustomer(customerToEdit._id, sanitizedData);
-        success('Customer details updated');
-        onSaved(res.data);
+      if (isEditMode) {
+        const res = await customersApi.updateCustomer(activeCustomer._id, sanitizedData);
+        success('Customer details updated successfully');
+        if (handleSuccess) handleSuccess(res.data);
       } else {
         const res = await customersApi.createCustomer(sanitizedData);
-        success('New customer created');
-        onSaved(res.data);
+        success('New customer created successfully');
+        if (handleSuccess) handleSuccess(res.data);
       }
       onClose();
     } catch (err) {
-      setError(err.message || 'Error saving customer');
+      setError(err.message || (isEditMode ? 'Error updating customer' : 'Error creating customer'));
     } finally {
       setLoading(false);
     }
@@ -81,13 +93,17 @@ export const CustomerModal = ({ isOpen, onClose, customerToEdit, onSaved }) => {
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.6)',
-        backdropFilter: 'blur(3px)',
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000,
-        padding: '20px',
+        zIndex: 1050,
+        padding: '16px',
+        overflowY: 'auto',
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !loading) onClose();
       }}
     >
       <div
@@ -95,87 +111,171 @@ export const CustomerModal = ({ isOpen, onClose, customerToEdit, onSaved }) => {
         style={{
           width: '100%',
           maxWidth: '520px',
+          maxHeight: 'calc(100vh - 32px)',
+          display: 'flex',
+          flexDirection: 'column',
           boxShadow: 'var(--shadow-xl)',
           position: 'relative',
+          padding: '24px',
+          overflow: 'hidden',
         }}
       >
-        <div className="card-header" style={{ marginBottom: '16px' }}>
-          <div className="card-title">
+        {/* Modal Header */}
+        <div
+          className="card-header"
+          style={{
+            marginBottom: '16px',
+            flexShrink: 0,
+            paddingBottom: '12px',
+          }}
+        >
+          <div className="card-title" style={{ fontSize: '1.15rem' }}>
             <User size={20} color="var(--primary)" />
-            {customerToEdit ? 'Edit Customer' : 'Add New Customer'}
+            <span>{isEditMode ? 'Edit Customer' : 'Add New Customer'}</span>
           </div>
           <button
             type="button"
             onClick={onClose}
-            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+            disabled={loading}
+            aria-label="Close modal"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#94a3b8',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              padding: '6px',
+              borderRadius: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
             <X size={20} />
           </button>
         </div>
 
         {error && (
-          <div style={{ padding: '10px 14px', backgroundColor: '#fef2f2', color: '#dc2626', borderRadius: '8px', fontSize: '0.88rem', marginBottom: '16px', border: '1px solid #fecaca' }}>
+          <div
+            style={{
+              padding: '10px 14px',
+              backgroundColor: '#fef2f2',
+              color: '#dc2626',
+              borderRadius: '8px',
+              fontSize: '0.88rem',
+              marginBottom: '16px',
+              border: '1px solid #fecaca',
+              flexShrink: 0,
+            }}
+          >
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">
-              Customer Name <span className="required">*</span>
-            </label>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="e.g. Ramesh Patel"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-            />
+        {/* Scrollable Form Body */}
+        <form
+          onSubmit={handleSubmit}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1,
+            overflowY: 'auto',
+            paddingRight: '2px',
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
+            <div className="form-group">
+              <label className="form-label">
+                Customer Name <span className="required">*</span>
+              </label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="e.g. Ramesh Patel"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+                disabled={loading}
+                autoFocus
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">
+                Mobile Number <span className="required">*</span>
+              </label>
+              <input
+                type="tel"
+                className="form-control"
+                placeholder="e.g. 9876543210 (10 digits)"
+                value={formData.mobileNumber}
+                onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })}
+                required
+                disabled={loading}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">
+                Address <span className="label-sub">(Optional)</span>
+              </label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Street, Area, City..."
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                disabled={loading}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">
+                Notes <span className="label-sub">(Optional)</span>
+              </label>
+              <textarea
+                className="form-textarea"
+                placeholder="Preferences, fitting notes, reference..."
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                rows={3}
+                disabled={loading}
+              />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">
-              Mobile Number <span className="required">*</span>
-            </label>
-            <input
-              type="tel"
-              className="form-control"
-              placeholder="e.g. 9876543210"
-              value={formData.mobileNumber}
-              onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Address <span className="label-sub">(Optional)</span></label>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Street, Area, City..."
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Notes <span className="label-sub">(Optional)</span></label>
-            <textarea
-              className="form-textarea"
-              placeholder="Preferences, fitting notes, reference..."
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              rows={3}
-            />
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px' }}>
-            <button type="button" onClick={onClose} className="btn btn-outline" disabled={loading}>
+          {/* Modal Actions Footer */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '10px',
+              marginTop: '20px',
+              paddingTop: '14px',
+              borderTop: '1px solid var(--border-light)',
+              flexShrink: 0,
+            }}
+          >
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn btn-outline"
+              disabled={loading}
+            >
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              <Save size={16} /> {loading ? 'Saving...' : 'Save Customer'}
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={loading}
+            >
+              <Save size={16} />{' '}
+              {loading
+                ? isEditMode
+                  ? 'Updating...'
+                  : 'Saving...'
+                : isEditMode
+                ? 'Update Customer'
+                : 'Save Customer'}
             </button>
           </div>
         </form>

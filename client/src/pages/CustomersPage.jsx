@@ -136,9 +136,28 @@ export const CustomersPage = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Search and Action Bar */}
       <div className="card" style={{ padding: '16px 20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+        <div
+          className="customers-action-bar"
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '14px',
+          }}
+        >
           {/* Real-time Debounced Search */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '260px' }}>
+          <div
+            className="search-container"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              flex: '1 1 240px',
+              minWidth: '0',
+              maxWidth: '100%',
+            }}
+          >
             <SearchInput
               value={search}
               onChange={setSearch}
@@ -152,7 +171,7 @@ export const CustomersPage = () => {
                 type="button"
                 onClick={handleResetFilters}
                 className="btn btn-outline btn-sm"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', flexShrink: 0 }}
                 title="Reset search and sorting"
               >
                 <RotateCcw size={14} /> Clear
@@ -160,7 +179,15 @@ export const CustomersPage = () => {
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div
+            className="filter-controls"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              flexWrap: 'wrap',
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <ArrowUpDown size={16} color="var(--text-muted)" />
               <select
@@ -168,6 +195,7 @@ export const CustomersPage = () => {
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
                 style={{ width: 'auto', padding: '6px 12px', fontSize: '0.88rem' }}
+                aria-label="Sort customers"
               >
                 <option value="newest">Recently Updated</option>
                 <option value="oldest">Oldest First</option>
@@ -176,7 +204,7 @@ export const CustomersPage = () => {
               </select>
             </div>
 
-            <button onClick={handleOpenAdd} className="btn btn-primary btn-sm">
+            <button onClick={handleOpenAdd} className="btn btn-primary btn-sm" style={{ whiteSpace: 'nowrap' }}>
               <Plus size={16} /> Add Customer
             </button>
           </div>
@@ -218,7 +246,7 @@ export const CustomersPage = () => {
                   <tr>
                     <th
                       onClick={() => handleSortToggle('name')}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      style={{ cursor: 'pointer', userSelect: 'none', minWidth: '160px' }}
                       title="Sort by Customer Name"
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -226,12 +254,12 @@ export const CustomersPage = () => {
                         {getSortIcon('name')}
                       </div>
                     </th>
-                    <th>Mobile Number</th>
-                    <th>Address</th>
-                    <th>Total Orders</th>
+                    <th style={{ minWidth: '140px' }}>Mobile Number</th>
+                    <th style={{ minWidth: '160px' }}>Address</th>
+                    <th style={{ minWidth: '110px' }}>Total Orders</th>
                     <th
                       onClick={() => handleSortToggle('date')}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      style={{ cursor: 'pointer', userSelect: 'none', minWidth: '120px' }}
                       title="Sort by Date"
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -239,8 +267,8 @@ export const CustomersPage = () => {
                         {getSortIcon('date')}
                       </div>
                     </th>
-                    <th>Next Deadline</th>
-                    <th style={{ textAlign: 'right' }}>Actions</th>
+                    <th style={{ minWidth: '120px' }}>Next Deadline</th>
+                    <th style={{ textAlign: 'right', minWidth: '100px' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -298,18 +326,20 @@ export const CustomersPage = () => {
                           <button
                             onClick={() => navigate(`/customers/${c._id}`)}
                             className="btn btn-outline btn-sm"
-                            style={{ padding: '4px 8px' }}
+                            style={{ minWidth: '36px', minHeight: '36px', padding: '6px' }}
                             title="View Customer Profile"
+                            aria-label={`View profile of ${c.name}`}
                           >
-                            <Eye size={15} />
+                            <Eye size={16} />
                           </button>
                           <button
                             onClick={() => handleOpenEdit(c)}
                             className="btn btn-outline btn-sm"
-                            style={{ padding: '4px 8px' }}
+                            style={{ minWidth: '36px', minHeight: '36px', padding: '6px' }}
                             title="Edit Customer"
+                            aria-label={`Edit ${c.name}`}
                           >
-                            <Edit size={15} />
+                            <Edit size={16} />
                           </button>
                         </div>
                       </td>
@@ -337,11 +367,37 @@ export const CustomersPage = () => {
       {modalOpen && (
         <CustomerModal
           isOpen={modalOpen}
-          onClose={() => setModalOpen(false)}
+          onClose={() => {
+            setModalOpen(false);
+            setCustomerToEdit(null);
+          }}
+          customerToEdit={customerToEdit}
           customer={customerToEdit}
+          onSaved={() => fetchCustomers(pagination.page, pageSize)}
           onSuccess={() => fetchCustomers(pagination.page, pageSize)}
         />
       )}
+
+      <style>{`
+        @media (max-width: 640px) {
+          .customers-action-bar {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 12px !important;
+          }
+          .search-container {
+            width: 100% !important;
+            max-width: 100% !important;
+          }
+          .filter-controls {
+            width: 100% !important;
+            justify-content: space-between !important;
+          }
+          .filter-controls .form-select {
+            flex: 1 !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };
