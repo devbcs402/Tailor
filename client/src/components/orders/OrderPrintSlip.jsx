@@ -18,7 +18,7 @@ export const OrderPrintSlip = ({ order, onClose }) => {
   const handleDownloadPdf = () => {
     try {
       setGenerating(true);
-      downloadOrderSlipPdf(order, user);
+      downloadOrderSlipPdf(order, user, { shirtDefinitions, pantDefinitions });
       success(`PDF Order Slip for #${order.orderNumber} downloaded successfully!`);
     } catch (err) {
       toastError(err.message || 'Failed to generate PDF slip');
@@ -29,7 +29,7 @@ export const OrderPrintSlip = ({ order, onClose }) => {
 
   const handleOpenPdf = () => {
     try {
-      const url = getOrderSlipPdfBlobUrl(order, user);
+      const url = getOrderSlipPdfBlobUrl(order, user, { shirtDefinitions, pantDefinitions });
       window.open(url, '_blank');
     } catch (err) {
       toastError(err.message || 'Failed to open PDF slip');

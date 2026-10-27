@@ -138,13 +138,14 @@ export const createCustomer = async (req, res, next) => {
       });
     }
 
-    const cleanMobile = String(mobileNumber).replace(/\D/g, '').trim();
-    if (cleanMobile.length !== 10) {
+    const rawMobile = String(mobileNumber || '').trim();
+    if (!/^\d{10}$/.test(rawMobile)) {
       return res.status(400).json({
         success: false,
         message: 'Mobile number must be exactly 10 digits',
       });
     }
+    const cleanMobile = rawMobile;
 
     // Check if customer already exists within THIS tenant
     const existing = await Customer.findOne({ tenantId, mobileNumber: cleanMobile });
@@ -201,13 +202,14 @@ export const updateCustomer = async (req, res, next) => {
       customer.name = name.trim();
     }
     if (mobileNumber !== undefined) {
-      const cleanMobile = String(mobileNumber).replace(/\D/g, '').trim();
-      if (cleanMobile.length !== 10) {
+      const rawMobile = String(mobileNumber || '').trim();
+      if (!/^\d{10}$/.test(rawMobile)) {
         return res.status(400).json({
           success: false,
           message: 'Mobile number must be exactly 10 digits',
         });
       }
+      const cleanMobile = rawMobile;
       // Check collision within this tenant only
       const duplicate = await Customer.findOne({
         tenantId,

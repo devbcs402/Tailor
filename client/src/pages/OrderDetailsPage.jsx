@@ -171,7 +171,7 @@ export const OrderDetailsPage = () => {
           <button
             onClick={() => {
               try {
-                downloadOrderSlipPdf(order, user);
+                downloadOrderSlipPdf(order, user, { shirtDefinitions, pantDefinitions });
                 success(`Order Slip #${order.orderNumber} downloaded!`);
               } catch (err) {
                 toastError(err.message || 'Failed to generate PDF');

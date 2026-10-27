@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
-import { SHIRT_FIELDS, PANT_FIELDS, getFieldValue } from '../utils/measurementLabels.js';
+import { SHIRT_FIELDS, PANT_FIELDS, getFieldValue, normalizeKey } from '../utils/measurementLabels.js';
+import { getShirtPatternLabel, getPantPatternLabel } from '../utils/patternOptions.js';
 import { formatDate } from '../utils/dateUtils.js';
 
 /**
@@ -22,15 +23,22 @@ const COLORS = {
 };
 
 /**
- * Format pattern names from order data without dummy defaults
+ * Format pattern names from order data with human labels and custom patterns
  */
-const getPatternsDisplay = (garment) => {
-  if (!garment) return 'None specified';
-  const patterns = Array.isArray(garment.patterns) && garment.patterns.length > 0
+const getPatternsDisplay = (garment, category = 'shirt') => {
+  if (!garment) return 'Standard / None';
+  const rawList = Array.isArray(garment.patterns) && garment.patterns.length > 0
     ? garment.patterns
-    : (garment.pattern ? [garment.pattern] : []);
+    : (garment.pattern ? (Array.isArray(garment.pattern) ? garment.pattern : String(garment.pattern).split(',').map((s) => s.trim())) : []);
 
-  const items = [...patterns];
+  const items = [];
+  rawList.filter(Boolean).forEach((pat) => {
+    const formatted = category === 'shirt'
+      ? getShirtPatternLabel(pat, pat)
+      : getPantPatternLabel(pat, pat);
+    items.push(formatted || pat);
+  });
+
   if (garment.customPattern && String(garment.customPattern).trim()) {
     items.push(`Custom: ${garment.customPattern.trim()}`);
   }
@@ -39,42 +47,104 @@ const getPatternsDisplay = (garment) => {
 };
 
 /**
- * Resolve displayable measurement fields from snapshot or raw measurements
+ * Resolve displayable measurement fields dynamically from:
+ * 1. Saved order measurement snapshot (preserves historical field labels & Gujarati names)
+ * 2. Active/configured tenant definitions
+ * 3. Any additional custom measurement keys stored in the order
  */
-const resolvePdfFields = (category, measurements = {}, snapshotList = []) => {
-  if (Array.isArray(snapshotList) && snapshotList.length > 0) {
-    return snapshotList.map((s) => {
-      const liveVal = getFieldValue(measurements, s.fieldKey);
-      return {
-        key: s.fieldKey,
-        label: s.displayName || s.fieldKey,
-        val: liveVal !== '' ? String(liveVal) : (s.value !== undefined && s.value !== null ? String(s.value) : '-'),
-      };
+const resolvePdfFields = (category, measurements = {}, snapshotList = [], tenantDefs = []) => {
+  const result = [];
+  const handledKeys = new Set();
+  const norm = (k) => String(k || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  // Index tenant definitions by exact key and normalized key
+  const defsMap = new Map();
+  if (Array.isArray(tenantDefs)) {
+    tenantDefs.forEach((d) => {
+      if (d.fieldKey) {
+        defsMap.set(d.fieldKey, d);
+        defsMap.set(norm(d.fieldKey), d);
+      }
     });
   }
 
-  const baseFields = category === 'shirt' ? SHIRT_FIELDS : PANT_FIELDS;
-  const result = [];
-  const knownKeys = new Set();
+  // 1. Process Order Snapshot if present (preserves historical naming & order)
+  if (Array.isArray(snapshotList) && snapshotList.length > 0) {
+    snapshotList.forEach((s) => {
+      const k = s.fieldKey;
+      handledKeys.add(k);
+      handledKeys.add(norm(k));
 
-  baseFields.forEach((f) => {
-    knownKeys.add(f.key);
-    const v = getFieldValue(measurements, f.key);
-    result.push({
-      key: f.key,
-      label: f.en || f.label,
-      val: v !== undefined && v !== null && String(v).trim().length > 0 ? String(v) : '-',
+      const liveVal = getFieldValue(measurements, k);
+      const finalVal = liveVal !== ''
+        ? String(liveVal)
+        : (s.value !== undefined && s.value !== null && String(s.value).trim() !== '' ? String(s.value) : '-');
+
+      const def = defsMap.get(k) || defsMap.get(norm(k));
+      const displayName = s.displayName || def?.displayName || k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      const gujaratiName = s.gujaratiName || def?.gujaratiName || '';
+
+      result.push({
+        key: k,
+        label: displayName,
+        gujaratiLabel: gujaratiName,
+        val: finalVal,
+      });
     });
-  });
+  }
 
-  Object.keys(measurements).forEach((k) => {
-    if (k !== 'notes' && !knownKeys.has(k)) {
-      const v = measurements[k];
-      if (v !== undefined && v !== null && String(v).trim().length > 0) {
-        const cleanLabel = k.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+  // 2. Process Tenant Definitions not in snapshot (e.g., newly added definitions or orders without snapshot)
+  if (Array.isArray(tenantDefs) && tenantDefs.length > 0) {
+    tenantDefs.forEach((def) => {
+      const k = def.fieldKey;
+      if (!handledKeys.has(k) && !handledKeys.has(norm(k))) {
+        handledKeys.add(k);
+        handledKeys.add(norm(k));
+        const liveVal = getFieldValue(measurements, k);
         result.push({
           key: k,
-          label: cleanLabel,
+          label: def.displayName || k,
+          gujaratiLabel: def.gujaratiName || '',
+          val: liveVal !== '' ? String(liveVal) : '-',
+        });
+      }
+    });
+  } else if (!snapshotList || snapshotList.length === 0) {
+    // Fallback to baseline fields if neither snapshot nor tenant definitions are available
+    const baseFields = category === 'shirt' ? SHIRT_FIELDS : PANT_FIELDS;
+    baseFields.forEach((f) => {
+      const k = f.key;
+      handledKeys.add(k);
+      handledKeys.add(norm(k));
+      const liveVal = getFieldValue(measurements, k);
+      result.push({
+        key: k,
+        label: f.label,
+        gujaratiLabel: f.gujaratiLabel || '',
+        val: liveVal !== '' ? String(liveVal) : '-',
+      });
+    });
+  }
+
+  // 3. Process ANY remaining raw measurement keys in the order (custom fields, historical values)
+  Object.keys(measurements || {}).forEach((k) => {
+    if (
+      k !== 'notes' &&
+      k !== '_id' &&
+      !k.startsWith('$') &&
+      !k.startsWith('_') &&
+      !handledKeys.has(k) &&
+      !handledKeys.has(norm(k))
+    ) {
+      const v = measurements[k];
+      if (v !== undefined && v !== null && String(v).trim().length > 0) {
+        handledKeys.add(k);
+        handledKeys.add(norm(k));
+        const def = defsMap.get(k) || defsMap.get(norm(k));
+        result.push({
+          key: k,
+          label: def?.displayName || k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+          gujaratiLabel: def?.gujaratiName || '',
           val: String(v),
         });
       }
@@ -87,10 +157,12 @@ const resolvePdfFields = (category, measurements = {}, snapshotList = []) => {
 /**
  * Build the jsPDF document for a given order
  */
-export const generateOrderSlipPdf = (order, user = null) => {
+export const generateOrderSlipPdf = (order, user = null, options = {}) => {
   if (!order) {
     throw new Error('Order data is required to generate a print slip.');
   }
+
+  const { shirtDefinitions = [], pantDefinitions = [] } = options;
 
   // Create A4 portrait document (210mm x 297mm)
   const doc = new jsPDF({
@@ -234,7 +306,7 @@ export const generateOrderSlipPdf = (order, user = null) => {
   if (order.shirt?.quantity > 0) {
     const sQty = order.shirt.quantity;
     const sMeasurements = order.shirt.measurements || {};
-    const sPatternsText = getPatternsDisplay(order.shirt);
+    const sPatternsText = getPatternsDisplay(order.shirt, 'shirt');
 
     // Section Header Banner
     doc.setFillColor(...COLORS.primaryNavy);
@@ -266,7 +338,7 @@ export const generateOrderSlipPdf = (order, user = null) => {
     y += 9;
 
     // Measurement Box Grid (6 columns across contentWidth)
-    const displayShirtFields = resolvePdfFields('shirt', sMeasurements, order.measurementSnapshot?.shirt);
+    const displayShirtFields = resolvePdfFields('shirt', sMeasurements, order.measurementSnapshot?.shirt, shirtDefinitions);
 
     const colsPerRow = 6;
     const boxW = (contentWidth - (colsPerRow - 1) * 3) / colsPerRow;
@@ -283,18 +355,27 @@ export const generateOrderSlipPdf = (order, user = null) => {
       doc.setLineWidth(0.25);
       doc.roundedRect(bx, by, boxW, boxH, 1.5, 1.5, 'FD');
 
-      // Label (English name)
+      // Label (English name + optional Gujarati in parentheses)
       doc.setTextColor(...COLORS.mutedText);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(6.8);
-      const labelText = field.label || field.key;
-      doc.text(labelText, bx + boxW / 2, by + 4.5, { align: 'center' });
+      let labelText = field.label || field.key;
+      if (field.gujaratiLabel) {
+        labelText = `${labelText} (${field.gujaratiLabel})`;
+      }
+      const maxW = boxW - 2;
+      const textWidth = doc.getTextWidth(labelText);
+      if (textWidth > maxW) {
+        doc.setFontSize(Math.max(4.8, 6.8 * (maxW / textWidth)));
+      } else {
+        doc.setFontSize(6.8);
+      }
+      doc.text(labelText, bx + boxW / 2, by + 4.5, { align: 'center', maxWidth: maxW });
 
       // Measurement Value
       doc.setTextColor(...COLORS.primaryNavy);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10.5);
-      const val = field.val !== undefined && field.val !== null ? String(field.val) : (sMeasurements[field.key] ? String(sMeasurements[field.key]) : '-');
+      const val = field.val !== undefined && field.val !== null ? String(field.val) : '-';
       doc.text(val, bx + boxW / 2, by + 10.5, { align: 'center' });
     });
 
@@ -317,7 +398,7 @@ export const generateOrderSlipPdf = (order, user = null) => {
   if (order.pant?.quantity > 0) {
     const pQty = order.pant.quantity;
     const pMeasurements = order.pant.measurements || {};
-    const pPatternsText = getPatternsDisplay(order.pant);
+    const pPatternsText = getPatternsDisplay(order.pant, 'pant');
 
     // Section Header Banner
     doc.setFillColor(...COLORS.deepNavy);
@@ -349,7 +430,7 @@ export const generateOrderSlipPdf = (order, user = null) => {
     y += 9;
 
     // Measurement Box Grid
-    const displayPantFields = resolvePdfFields('pant', pMeasurements, order.measurementSnapshot?.pant);
+    const displayPantFields = resolvePdfFields('pant', pMeasurements, order.measurementSnapshot?.pant, pantDefinitions);
 
     const colsPerRow = 6;
     const boxW = (contentWidth - (colsPerRow - 1) * 3) / colsPerRow;
@@ -366,18 +447,27 @@ export const generateOrderSlipPdf = (order, user = null) => {
       doc.setLineWidth(0.25);
       doc.roundedRect(bx, by, boxW, boxH, 1.5, 1.5, 'FD');
 
-      // Label
+      // Label (English name + optional Gujarati in parentheses)
       doc.setTextColor(...COLORS.mutedText);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(6.8);
-      const labelText = field.label || field.key;
-      doc.text(labelText, bx + boxW / 2, by + 4.5, { align: 'center' });
+      let labelText = field.label || field.key;
+      if (field.gujaratiLabel) {
+        labelText = `${labelText} (${field.gujaratiLabel})`;
+      }
+      const maxW = boxW - 2;
+      const textWidth = doc.getTextWidth(labelText);
+      if (textWidth > maxW) {
+        doc.setFontSize(Math.max(4.8, 6.8 * (maxW / textWidth)));
+      } else {
+        doc.setFontSize(6.8);
+      }
+      doc.text(labelText, bx + boxW / 2, by + 4.5, { align: 'center', maxWidth: maxW });
 
       // Measurement Value
       doc.setTextColor(...COLORS.primaryNavy);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10.5);
-      const val = field.val !== undefined && field.val !== null ? String(field.val) : (pMeasurements[field.key] ? String(pMeasurements[field.key]) : '-');
+      const val = field.val !== undefined && field.val !== null ? String(field.val) : '-';
       doc.text(val, bx + boxW / 2, by + 10.5, { align: 'center' });
     });
 
@@ -420,6 +510,11 @@ export const generateOrderSlipPdf = (order, user = null) => {
   }
 
   // 6. TAILOR WORKSHOP SIGN-OFF & VERIFICATION
+  if (y + 40 > pageHeight - 12) {
+    doc.addPage();
+    y = margin + 8;
+  }
+
   const footerY = Math.max(y + 8, pageHeight - 34);
 
   doc.setDrawColor(...COLORS.borderLight);
@@ -471,8 +566,8 @@ export const generateOrderSlipPdf = (order, user = null) => {
 /**
  * Trigger immediate client-side download of the Order Slip PDF
  */
-export const downloadOrderSlipPdf = (order, user = null) => {
-  const doc = generateOrderSlipPdf(order, user);
+export const downloadOrderSlipPdf = (order, user = null, options = {}) => {
+  const doc = generateOrderSlipPdf(order, user, options);
   const cleanOrderNum = String(order.orderNumber || 'Order').replace(/[^a-zA-Z0-9_-]/g, '_');
   doc.save(`Order_Slip_${cleanOrderNum}.pdf`);
 };
@@ -480,8 +575,8 @@ export const downloadOrderSlipPdf = (order, user = null) => {
 /**
  * Get Blob URL for instant PDF preview inside an iframe
  */
-export const getOrderSlipPdfBlobUrl = (order, user = null) => {
-  const doc = generateOrderSlipPdf(order, user);
+export const getOrderSlipPdfBlobUrl = (order, user = null, options = {}) => {
+  const doc = generateOrderSlipPdf(order, user, options);
   const blob = doc.output('blob');
   return URL.createObjectURL(blob);
 };

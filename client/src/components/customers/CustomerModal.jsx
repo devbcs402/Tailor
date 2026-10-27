@@ -56,15 +56,15 @@ export const CustomerModal = ({
       return;
     }
 
-    const digitsOnly = formData.mobileNumber.replace(/\D/g, '');
-    if (!formData.mobileNumber.trim() || digitsOnly.length !== 10) {
+    const rawMobile = (formData.mobileNumber || '').trim();
+    if (!rawMobile || !/^\d{10}$/.test(rawMobile)) {
       setError('Please enter a valid 10-digit mobile number');
       return;
     }
 
     const sanitizedData = {
       name: cleanName,
-      mobileNumber: digitsOnly,
+      mobileNumber: rawMobile,
       address: formData.address ? formData.address.trim() : '',
       notes: formData.notes ? formData.notes.trim() : '',
     };
@@ -205,10 +205,15 @@ export const CustomerModal = ({
               </label>
               <input
                 type="tel"
+                inputMode="numeric"
+                maxLength={10}
                 className="form-control"
                 placeholder="e.g. 9876543210 (10 digits)"
                 value={formData.mobileNumber}
-                onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })}
+                onChange={(e) => {
+                  const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setFormData({ ...formData, mobileNumber: digitsOnly });
+                }}
                 required
                 disabled={loading}
               />

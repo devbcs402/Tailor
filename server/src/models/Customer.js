@@ -90,6 +90,7 @@ const customerSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Mobile number is required'],
       trim: true,
+      match: [/^\d{10}$/, 'Mobile number must be exactly 10 digits'],
       index: true,
     },
     address: {

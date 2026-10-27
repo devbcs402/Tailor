@@ -17,6 +17,7 @@ router.get('/', getCustomers);
 router.post('/', createCustomer);
 router.get('/:id', getCustomerById);
 router.patch('/:id', updateCustomer);
+router.put('/:id', updateCustomer);
 router.patch('/:id/measurements', updateCustomerMeasurements);
 router.get('/:id/orders', getCustomerOrders);
 

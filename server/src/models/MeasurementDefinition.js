@@ -41,11 +41,16 @@ const measurementDefinitionSchema = new mongoose.Schema(
     },
     isRequired: {
       type: Boolean,
-      default: false,
+      default: true,
     },
     isActive: {
       type: Boolean,
       default: true,
+      index: true,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
       index: true,
     },
     displayOrder: {

@@ -33,7 +33,7 @@ export const getMeasurementDefinitions = async (req, res, next) => {
       await seedTenantDefaultMeasurements(tenantId);
     }
 
-    const query = { tenantId };
+    const query = { tenantId, isDeleted: { $ne: true } };
 
     if (category) {
       const validCategories = ['shirt_measurement', 'pant_measurement'];
@@ -81,7 +81,7 @@ export const createMeasurementDefinition = async (req, res, next) => {
       category,
       fieldType = 'number',
       unit = '',
-      isRequired = false,
+      isRequired = true,
       isActive = true,
       displayOrder,
       fieldKey: customKey,
@@ -117,7 +117,16 @@ export const createMeasurementDefinition = async (req, res, next) => {
       finalKey = `field_${Date.now()}`;
     }
 
-    // 5. Prevent Duplicate Key within the Same Tenant & Category
+    // 5. Calculate Display Order if not provided
+    let orderNum = parseInt(displayOrder, 10);
+    if (isNaN(orderNum) || orderNum <= 0) {
+      const highestOrderDoc = await MeasurementDefinition.findOne({ tenantId, category })
+        .sort({ displayOrder: -1 })
+        .lean();
+      orderNum = highestOrderDoc ? (highestOrderDoc.displayOrder || 0) + 1 : 1;
+    }
+
+    // 6. Prevent Duplicate Key within the Same Tenant & Category
     const duplicate = await MeasurementDefinition.findOne({
       tenantId,
       category,
@@ -125,6 +134,24 @@ export const createMeasurementDefinition = async (req, res, next) => {
     });
 
     if (duplicate) {
+      // If deleted duplicate exists, resurrect it with new properties
+      if (duplicate.isDeleted) {
+        duplicate.isDeleted = false;
+        duplicate.isActive = isActive !== undefined ? Boolean(isActive) : true;
+        duplicate.displayName = displayName.trim();
+        duplicate.gujaratiName = gujaratiName ? gujaratiName.trim() : '';
+        duplicate.fieldType = fieldType;
+        duplicate.isRequired = isRequired !== undefined ? Boolean(isRequired) : true;
+        duplicate.displayOrder = orderNum;
+        await duplicate.save();
+
+        return res.status(201).json({
+          success: true,
+          message: `Measurement "${duplicate.displayName}" added successfully`,
+          data: duplicate,
+        });
+      }
+
       // If inactive duplicate exists, tenant can choose to reactivate
       if (!duplicate.isActive) {
         return res.status(409).json({
@@ -138,15 +165,6 @@ export const createMeasurementDefinition = async (req, res, next) => {
         success: false,
         message: `A measurement with key "${finalKey}" (${duplicate.displayName}) already exists in this category. Please choose a different name.`,
       });
-    }
-
-    // 6. Calculate Display Order if not provided
-    let orderNum = parseInt(displayOrder, 10);
-    if (isNaN(orderNum) || orderNum <= 0) {
-      const highestOrderDoc = await MeasurementDefinition.findOne({ tenantId, category })
-        .sort({ displayOrder: -1 })
-        .lean();
-      orderNum = highestOrderDoc ? (highestOrderDoc.displayOrder || 0) + 1 : 1;
     }
 
     const newDef = new MeasurementDefinition({
@@ -326,6 +344,38 @@ export const reorderMeasurementDefinitions = async (req, res, next) => {
     return res.json({
       success: true,
       message: 'Measurement field order updated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * DELETE /api/measurement-definitions/:id
+ * Delete a measurement definition (soft delete within tenant to protect historical orders & customer records)
+ */
+export const deleteMeasurementDefinition = async (req, res, next) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { id } = req.params;
+
+    const definition = await MeasurementDefinition.findOne({ _id: id, tenantId });
+    if (!definition) {
+      return res.status(404).json({
+        success: false,
+        message: 'Measurement definition not found or belongs to another business.',
+      });
+    }
+
+    // Soft delete within authenticated tenant
+    definition.isDeleted = true;
+    definition.isActive = false;
+    await definition.save();
+
+    return res.json({
+      success: true,
+      message: `Measurement "${definition.displayName}" deleted successfully`,
+      data: definition,
     });
   } catch (error) {
     next(error);

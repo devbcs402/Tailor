@@ -32,4 +32,9 @@ export const measurementDefinitionsApi = {
    * Batch update display orders
    */
   reorderDefinitions: (items) => api.put('/measurement-definitions/reorder', { items }),
+
+  /**
+   * Delete a measurement definition
+   */
+  deleteDefinition: (id) => api.delete(`/measurement-definitions/${id}`),
 };

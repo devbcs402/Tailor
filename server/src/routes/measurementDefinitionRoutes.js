@@ -5,6 +5,7 @@ import {
   updateMeasurementDefinition,
   toggleMeasurementDefinitionStatus,
   reorderMeasurementDefinitions,
+  deleteMeasurementDefinition,
 } from '../controllers/measurementDefinitionController.js';
 import { requireAuth } from '../middleware/authMiddleware.js';
 
@@ -19,5 +20,6 @@ router.put('/reorder', reorderMeasurementDefinitions);
 router.put('/:id', updateMeasurementDefinition);
 router.patch('/:id/status', toggleMeasurementDefinitionStatus);
 router.patch('/:id', updateMeasurementDefinition);
+router.delete('/:id', deleteMeasurementDefinition);
 
 export default router;

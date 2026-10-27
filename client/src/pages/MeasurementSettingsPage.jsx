@@ -24,6 +24,7 @@ import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { SearchInput } from '../components/common/SearchInput';
 import { notifyMeasurementsUpdated } from '../hooks/useTenantMeasurements';
 import { notifyPatternsUpdated } from '../hooks/useTenantPatterns';
+import { transliterateToGujarati, getGujaratiSuggestions } from '../utils/gujaratiTransliteration';
 
 export const MeasurementSettingsPage = () => {
   const navigate = useNavigate();
@@ -48,12 +49,18 @@ export const MeasurementSettingsPage = () => {
     gujaratiName: '',
     category: 'shirt_measurement',
     fieldType: 'number',
-    isRequired: false,
+    isRequired: true,
     isActive: true,
     displayOrder: 1,
   });
   const [savingDef, setSavingDef] = useState(false);
   const [modalError, setModalError] = useState('');
+  const [userEditedGujarati, setUserEditedGujarati] = useState(false);
+  const [gujaratiSuggestions, setGujaratiSuggestions] = useState([]);
+
+  // Delete measurement confirmation dialog state
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deletingMeasurement, setDeletingMeasurement] = useState(false);
 
   // Deactivate confirmation dialog state
   const [deactivateTarget, setDeactivateTarget] = useState(null);
@@ -140,12 +147,14 @@ export const MeasurementSettingsPage = () => {
       : 1;
 
     setEditingDef(null);
+    setUserEditedGujarati(false);
+    setGujaratiSuggestions([]);
     setModalFormData({
       displayName: '',
       gujaratiName: '',
       category: currentCategory,
       fieldType: 'number',
-      isRequired: false,
+      isRequired: true, // Default ON for new measurements
       isActive: true,
       displayOrder: nextOrder,
     });
@@ -158,17 +167,58 @@ export const MeasurementSettingsPage = () => {
   // -----------------------------------------------------------------
   const handleOpenEditModal = (def) => {
     setEditingDef(def);
+    setUserEditedGujarati(Boolean(def.gujaratiName && def.gujaratiName.trim()));
+    setGujaratiSuggestions(getGujaratiSuggestions(def.displayName || ''));
     setModalFormData({
       displayName: def.displayName || '',
       gujaratiName: def.gujaratiName || '',
       category: def.category || currentCategory,
       fieldType: def.fieldType || 'number',
-      isRequired: Boolean(def.isRequired),
+      isRequired: Boolean(def.isRequired), // Preserve saved configuration
       isActive: Boolean(def.isActive),
       displayOrder: def.displayOrder || 1,
     });
     setModalError('');
     setIsModalOpen(true);
+  };
+
+  // -----------------------------------------------------------------
+  // Gujarati Transliteration & Name Change Handlers
+  // -----------------------------------------------------------------
+  const handleDisplayNameChange = (e) => {
+    const newName = e.target.value;
+    const suggestions = getGujaratiSuggestions(newName);
+    setGujaratiSuggestions(suggestions);
+
+    if (!userEditedGujarati) {
+      const autoGujarati = transliterateToGujarati(newName);
+      setModalFormData((prev) => ({
+        ...prev,
+        displayName: newName,
+        gujaratiName: autoGujarati,
+      }));
+    } else {
+      setModalFormData((prev) => ({
+        ...prev,
+        displayName: newName,
+      }));
+    }
+  };
+
+  const handleGujaratiNameChange = (e) => {
+    setUserEditedGujarati(true);
+    setModalFormData((prev) => ({
+      ...prev,
+      gujaratiName: e.target.value,
+    }));
+  };
+
+  const handleApplySuggestion = (suggestionText) => {
+    setUserEditedGujarati(true);
+    setModalFormData((prev) => ({
+      ...prev,
+      gujaratiName: suggestionText,
+    }));
   };
 
   // -----------------------------------------------------------------
@@ -242,6 +292,25 @@ export const MeasurementSettingsPage = () => {
       toastError(err.message || 'Failed to update measurement status');
     } finally {
       setTogglingStatus(false);
+    }
+  };
+
+  // -----------------------------------------------------------------
+  // Delete Measurement Definition
+  // -----------------------------------------------------------------
+  const handleDeleteMeasurement = async () => {
+    if (!deleteTarget) return;
+    setDeletingMeasurement(true);
+    try {
+      const res = await measurementDefinitionsApi.deleteDefinition(deleteTarget._id);
+      success(res.message || `Measurement "${deleteTarget.displayName}" deleted successfully`);
+      setDeleteTarget(null);
+      fetchDefinitions();
+      notifyMeasurementsUpdated();
+    } catch (err) {
+      toastError(err.message || 'Failed to delete measurement definition');
+    } finally {
+      setDeletingMeasurement(false);
     }
   };
 
@@ -717,6 +786,19 @@ export const MeasurementSettingsPage = () => {
 
                             <button
                               type="button"
+                              onClick={() => setDeleteTarget(def)}
+                              className="btn btn-sm btn-outline"
+                              style={{
+                                color: '#dc2626',
+                                borderColor: '#fca5a5',
+                              }}
+                              title="Delete measurement"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+
+                            <button
+                              type="button"
                               onClick={() => handleToggleStatusClick(def)}
                               className={`btn btn-sm ${def.isActive ? 'btn-outline' : 'btn-primary'}`}
                               style={{
@@ -998,26 +1080,82 @@ export const MeasurementSettingsPage = () => {
                 <input
                   type="text"
                   className="form-control"
-                  placeholder="e.g. Pocket Height, Back Pleat, Inseam..."
+                  placeholder="e.g. Pocket Height, Back Pleat, Inseam, chhati, lambai..."
                   value={modalFormData.displayName}
-                  onChange={(e) => setModalFormData({ ...modalFormData, displayName: e.target.value })}
+                  onChange={handleDisplayNameChange}
                   required
                   autoFocus
                 />
               </div>
 
-              {/* Gujarati Display Name */}
+              {/* Gujarati Display Name with Transliteration & Suggestions */}
               <div className="form-group">
-                <label className="form-label">
-                  Gujarati Display Name (ગુજરાતી નામ) <span className="label-sub">(Optional)</span>
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label className="form-label" style={{ marginBottom: '4px' }}>
+                    Gujarati Display Name (ગુજરાતી નામ) <span className="label-sub">(Optional)</span>
+                  </label>
+                  {!userEditedGujarati && modalFormData.gujaratiName && (
+                    <span style={{ fontSize: '0.72rem', color: '#0f766e', fontWeight: 600 }}>
+                      ⚡ Auto-transliterated
+                    </span>
+                  )}
+                </div>
                 <input
                   type="text"
                   className="form-control"
-                  placeholder="e.g. ખિસ્સાની ઊંચાઈ, બેક પ્લીટ..."
+                  placeholder="e.g. ખિસ્સાની ઊંચાઈ, બેક પ્લીટ, છાતી..."
                   value={modalFormData.gujaratiName}
-                  onChange={(e) => setModalFormData({ ...modalFormData, gujaratiName: e.target.value })}
+                  onChange={handleGujaratiNameChange}
                 />
+
+                {/* Suggestions Pills */}
+                {gujaratiSuggestions.length > 0 && (
+                  <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Suggestions:</span>
+                    {gujaratiSuggestions.map((sug, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => handleApplySuggestion(sug)}
+                        style={{
+                          padding: '3px 9px',
+                          borderRadius: '4px',
+                          border: modalFormData.gujaratiName === sug ? '1px solid var(--accent-gold)' : '1px solid #cbd5e1',
+                          backgroundColor: modalFormData.gujaratiName === sug ? 'rgba(212, 175, 55, 0.15)' : '#f8fafc',
+                          color: modalFormData.gujaratiName === sug ? '#92400e' : '#334155',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          fontSize: '0.82rem',
+                          transition: 'all 0.15s ease',
+                        }}
+                        title={`Apply suggestion "${sug}"`}
+                      >
+                        {sug}
+                      </button>
+                    ))}
+                    {userEditedGujarati && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserEditedGujarati(false);
+                          const auto = transliterateToGujarati(modalFormData.displayName);
+                          setModalFormData((prev) => ({ ...prev, gujaratiName: auto }));
+                        }}
+                        style={{
+                          border: 'none',
+                          background: 'none',
+                          color: 'var(--primary)',
+                          fontSize: '0.75rem',
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                          padding: '2px 4px',
+                        }}
+                      >
+                        Reset to Auto
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Readonly Field Key Preview if editing */}
@@ -1143,6 +1281,24 @@ export const MeasurementSettingsPage = () => {
           onConfirm={() => executeToggleStatus(deactivateTarget, false)}
           onClose={() => !togglingStatus && setDeactivateTarget(null)}
           onCancel={() => !togglingStatus && setDeactivateTarget(null)}
+        />
+      )}
+
+      {/* ------------------------------------------------------------ */}
+      {/* DELETE MEASUREMENT CONFIRMATION DIALOG                       */}
+      {/* ------------------------------------------------------------ */}
+      {deleteTarget && (
+        <ConfirmDialog
+          isOpen={Boolean(deleteTarget)}
+          title={`Delete ${currentCategory === 'shirt_measurement' ? 'Shirt' : 'Pant'} Measurement`}
+          message={`Are you sure you want to delete the measurement '${deleteTarget.displayName}'? Existing orders and customer measurement records will remain intact.`}
+          confirmText="Delete Measurement"
+          confirmVariant="danger"
+          danger={true}
+          loading={deletingMeasurement}
+          onConfirm={handleDeleteMeasurement}
+          onClose={() => !deletingMeasurement && setDeleteTarget(null)}
+          onCancel={() => !deletingMeasurement && setDeleteTarget(null)}
         />
       )}
 
