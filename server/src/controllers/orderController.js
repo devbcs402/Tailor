@@ -502,11 +502,11 @@ export const createOrder = async (req, res, next) => {
         pant: pantQty > 0 ? buildMeasurementSnapshot(pant.measurements, pantDefs) : [],
       },
       pricing: {
-        shirtPrice: 0,
-        pantPrice: 0,
-        total: 0,
-        advancePaid: 0,
-        balanceDue: 0,
+        shirtPrice: Math.max(0, Number(pricing.shirtPrice) || 0),
+        pantPrice: Math.max(0, Number(pricing.pantPrice) || 0),
+        total: Math.max(0, Number(pricing.total) || 0),
+        advancePaid: Math.max(0, Number(pricing.advancePaid) || 0),
+        balanceDue: Number(pricing.balanceDue) || 0,
       },
     });
 
@@ -536,6 +536,7 @@ export const updateOrder = async (req, res, next) => {
       shirt,
       pant,
       specialInstructions,
+      pricing,
       saveAsDefaultMeasurements = false,
       saveAsLatestMeasurements = false,
     } = req.body;
@@ -761,6 +762,17 @@ export const updateOrder = async (req, res, next) => {
 
     if (specialInstructions !== undefined) {
       order.specialInstructions = specialInstructions ? specialInstructions.trim() : '';
+    }
+
+    if (pricing && typeof pricing === 'object') {
+      order.pricing = {
+        shirtPrice: pricing.shirtPrice !== undefined ? Math.max(0, Number(pricing.shirtPrice) || 0) : (order.pricing?.shirtPrice || 0),
+        pantPrice: pricing.pantPrice !== undefined ? Math.max(0, Number(pricing.pantPrice) || 0) : (order.pricing?.pantPrice || 0),
+        total: pricing.total !== undefined ? Math.max(0, Number(pricing.total) || 0) : (order.pricing?.total || 0),
+        advancePaid: pricing.advancePaid !== undefined ? Math.max(0, Number(pricing.advancePaid) || 0) : (order.pricing?.advancePaid || 0),
+        balanceDue: pricing.balanceDue !== undefined ? Number(pricing.balanceDue) || 0 : (order.pricing?.balanceDue || 0),
+      };
+      order.markModified('pricing');
     }
 
     // 6. Explicit Default Customer Measurements Update

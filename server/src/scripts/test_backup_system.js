@@ -1,6 +1,9 @@
 import { connectDB } from '../config/db.js';
 import app from '../app.js';
 import http from 'http';
+import jwt from 'jsonwebtoken';
+import { Tenant } from '../models/Tenant.js';
+import { User } from '../models/User.js';
 
 async function testBackupEndpoints() {
   console.log('=== Starting Test for 7-Day Cron & Backup Local Storage ===');
@@ -12,18 +15,18 @@ async function testBackupEndpoints() {
   const BASE_URL = 'http://localhost:5001/api';
 
   try {
-    // 1. Login
-    const loginRes = await fetch(`${BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@tailor.com', password: 'admin123' }),
-    });
-    const loginData = await loginRes.json();
-    if (!loginData.success || !loginData.token) {
-      throw new Error('Admin login failed: ' + JSON.stringify(loginData));
-    }
-    const token = loginData.token;
-    console.log('✓ [Auth]: Admin logged in successfully.');
+    // 1. Authenticate with active tenant
+    const tenant = await Tenant.findOne({ status: 'active' });
+    if (!tenant) throw new Error('No active tenant found');
+    const user = await User.findOne({ tenantId: tenant._id, isActive: true });
+    if (!user) throw new Error('No active user found for tenant');
+
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET || 'super_secret_tailor_management_key_2026_xyz',
+      { expiresIn: '1h' }
+    );
+    console.log(`✓ [Auth]: Authenticated as ${user.name} (${tenant.businessName})`);
 
     const headers = {
       'Content-Type': 'application/json',

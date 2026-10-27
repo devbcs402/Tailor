@@ -1,13 +1,18 @@
 {
   "name": "tailor-management-system",
   "version": "1.0.0",
-  "description": "Tailor Management System (Silai Master) - MERN Stack",
+  "description": "Tailor Management System - Multi-Tenant Bespoke Tailor Studio Platform",
   "private": true,
   "scripts": {
     "install:all": "npm install --prefix server && npm install --prefix client",
     "seed": "npm run seed --prefix server",
+    "test": "node server/src/scripts/verify_system.js",
     "test:api": "node server/src/scripts/verify_system.js",
     "test:backup": "node server/src/scripts/test_backup_system.js",
+    "test:measurements": "node server/src/scripts/verify_measurement_data_separation.js",
+    "test:pdf": "node server/src/scripts/verify_gujarati_pdf_rendering.js",
+    "test:customers": "node server/src/scripts/verify_customer_deletion.js",
+    "test:owner": "node server/src/scripts/verify_owner_login_activity_logs_dedup.js",
     "server": "npm run dev --prefix server",
     "client": "npm run dev --prefix client",
     "build:client": "npm run build --prefix client"
