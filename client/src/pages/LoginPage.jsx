@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useNavigate, Navigate, Link } from 'react-router-dom';
-import { Scissors, Eye, EyeOff, Lock, Mail, ArrowRight, Sparkles } from 'lucide-react';
+import { useNavigate, Navigate } from 'react-router-dom';
+import { Scissors, Eye, EyeOff, Lock, Mail, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
@@ -57,12 +57,6 @@ export const LoginPage = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickFill = () => {
-    setEmail('admin@tailor.com');
-    setPassword('admin123');
-    setError('');
   };
 
   return (
@@ -143,7 +137,7 @@ export const LoginPage = () => {
               <input
                 type="text"
                 className="form-control"
-                placeholder="e.g. admin@tailor.com"
+                placeholder="Enter your email or username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 style={{ paddingLeft: '40px' }}
@@ -207,56 +201,6 @@ export const LoginPage = () => {
             {loading ? 'Signing In...' : 'Sign In'} <ArrowRight size={18} />
           </button>
         </form>
-
-        {/* Quick Demo Fill Pill */}
-        <div
-          style={{
-            marginTop: '28px',
-            paddingTop: '20px',
-            borderTop: '1px solid #e2e8f0',
-            textAlign: 'center',
-          }}
-        >
-          <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '8px' }}>
-            Demo Account Credentials:
-          </div>
-          <button
-            type="button"
-            onClick={handleQuickFill}
-            style={{
-              background: '#f1f5f9',
-              border: '1px solid #cbd5e1',
-              borderRadius: '8px',
-              padding: '6px 14px',
-              fontSize: '0.82rem',
-              color: '#334155',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontWeight: 600,
-            }}
-          >
-            <Sparkles size={14} color="var(--accent-gold)" /> admin@tailor.com / admin123
-          </button>
-
-          <div style={{ marginTop: '16px' }}>
-            <Link
-              to="/owner/login"
-              style={{
-                color: '#64748b',
-                fontSize: '0.82rem',
-                textDecoration: 'none',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontWeight: 500,
-              }}
-            >
-              Platform Administrator? <span style={{ color: '#0b1f3a', fontWeight: 600 }}>Owner Portal &rarr;</span>
-            </Link>
-          </div>
-        </div>
       </div>
     </div>
   );
