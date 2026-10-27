@@ -145,17 +145,10 @@ export const changePassword = async (req, res, next) => {
   try {
     const { currentPassword, newPassword, confirmPassword } = req.body;
 
-    if (!newPassword) {
+    if (!newPassword || newPassword.length < 8) {
       return res.status(400).json({
         success: false,
-        message: 'New password is required',
-      });
-    }
-
-    if (newPassword.length < 12) {
-      return res.status(400).json({
-        success: false,
-        message: 'New password must be at least 12 characters long',
+        message: 'Password must be at least 8 characters long',
       });
     }
 
@@ -163,17 +156,6 @@ export const changePassword = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'New password and confirmation do not match',
-      });
-    }
-
-    // Complexity validation: uppercase, lowercase, and number
-    const hasUpper = /[A-Z]/.test(newPassword);
-    const hasLower = /[a-z]/.test(newPassword);
-    const hasNumber = /[0-9]/.test(newPassword);
-    if (!hasUpper || !hasLower || !hasNumber) {
-      return res.status(400).json({
-        success: false,
-        message: 'Password must contain at least one uppercase letter, one lowercase letter, and one number',
       });
     }
 

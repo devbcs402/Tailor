@@ -50,10 +50,7 @@ export const ChangePasswordPage = () => {
 
   // Password rules validation
   const rules = {
-    minLength: newPassword.length >= 12,
-    hasUpper: /[A-Z]/.test(newPassword),
-    hasLower: /[a-z]/.test(newPassword),
-    hasNumber: /[0-9]/.test(newPassword),
+    minLength: newPassword.length >= 8,
     passwordsMatch: newPassword.length > 0 && newPassword === confirmPassword,
     differentFromCurrent: currentPassword.length > 0 ? newPassword !== currentPassword : true,
   };
@@ -61,9 +58,6 @@ export const ChangePasswordPage = () => {
   const isFormValid =
     currentPassword.trim().length > 0 &&
     rules.minLength &&
-    rules.hasUpper &&
-    rules.hasLower &&
-    rules.hasNumber &&
     rules.passwordsMatch &&
     rules.differentFromCurrent;
 
@@ -76,8 +70,8 @@ export const ChangePasswordPage = () => {
       return;
     }
 
-    if (newPassword.length < 12) {
-      setError('New password must be at least 12 characters long.');
+    if (newPassword.length < 8) {
+      setError('Password must be at least 8 characters long.');
       return;
     }
 
@@ -88,11 +82,6 @@ export const ChangePasswordPage = () => {
 
     if (newPassword !== confirmPassword) {
       setError('New password and confirmation do not match.');
-      return;
-    }
-
-    if (!rules.hasUpper || !rules.hasLower || !rules.hasNumber) {
-      setError('Password must contain at least one uppercase letter, one lowercase letter, and one number.');
       return;
     }
 
@@ -301,7 +290,7 @@ export const ChangePasswordPage = () => {
                 type={showNew ? 'text' : 'password'}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Minimum 12 characters"
+                placeholder="Minimum 8 characters"
                 required
                 style={{
                   width: '100%',
@@ -406,22 +395,10 @@ export const ChangePasswordPage = () => {
             <div style={{ fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
               Password Requirements:
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '6px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: rules.minLength ? '#16a34a' : '#64748b' }}>
                 {rules.minLength ? <CheckCircle2 size={14} color="#16a34a" /> : <div style={{ width: 14, height: 14, borderRadius: '50%', border: '1.5px solid #cbd5e1' }} />}
-                At least 12 characters
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: rules.hasUpper ? '#16a34a' : '#64748b' }}>
-                {rules.hasUpper ? <CheckCircle2 size={14} color="#16a34a" /> : <div style={{ width: 14, height: 14, borderRadius: '50%', border: '1.5px solid #cbd5e1' }} />}
-                Uppercase letter (A-Z)
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: rules.hasLower ? '#16a34a' : '#64748b' }}>
-                {rules.hasLower ? <CheckCircle2 size={14} color="#16a34a" /> : <div style={{ width: 14, height: 14, borderRadius: '50%', border: '1.5px solid #cbd5e1' }} />}
-                Lowercase letter (a-z)
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: rules.hasNumber ? '#16a34a' : '#64748b' }}>
-                {rules.hasNumber ? <CheckCircle2 size={14} color="#16a34a" /> : <div style={{ width: 14, height: 14, borderRadius: '50%', border: '1.5px solid #cbd5e1' }} />}
-                At least one number (0-9)
+                Password must be at least 8 characters long
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: rules.passwordsMatch ? '#16a34a' : '#64748b' }}>
                 {rules.passwordsMatch ? <CheckCircle2 size={14} color="#16a34a" /> : <div style={{ width: 14, height: 14, borderRadius: '50%', border: '1.5px solid #cbd5e1' }} />}
@@ -429,7 +406,7 @@ export const ChangePasswordPage = () => {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: rules.differentFromCurrent ? '#16a34a' : '#dc2626' }}>
                 {rules.differentFromCurrent ? <CheckCircle2 size={14} color="#16a34a" /> : <div style={{ width: 14, height: 14, borderRadius: '50%', border: '1.5px solid #cbd5e1' }} />}
-                Different from initial
+                Different from initial / current password
               </div>
             </div>
           </div>

@@ -240,19 +240,19 @@ async function runVerification() {
       identicalRes.data.message
     );
 
-    // Test 3: Password too short (< 12 characters)
+    // Test 3: Password too short (< 8 characters)
     const shortRes = await request('/auth/change-password', {
       method: 'POST',
       headers: { Authorization: `Bearer ${adminToken}` },
       body: {
         currentPassword: 'InitialTempPassword123!',
-        newPassword: 'ShortPass1!',
-        confirmPassword: 'ShortPass1!',
+        newPassword: 'Short7!',
+        confirmPassword: 'Short7!',
       },
     });
     assert(
-      shortRes.status === 400 && shortRes.data.message?.includes('12 characters'),
-      'Rejects password shorter than 12 characters',
+      shortRes.status === 400 && shortRes.data.message?.includes('8 characters'),
+      'Rejects password shorter than 8 characters',
       shortRes.data.message
     );
 

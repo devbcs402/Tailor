@@ -163,8 +163,11 @@ export const createOrder = async (req, res, next) => {
       pant = {},
       specialInstructions = '',
       pricing = {},
+      saveAsDefaultMeasurements = false,
       saveAsLatestMeasurements = false,
     } = req.body;
+
+    const shouldSaveDefaults = Boolean(saveAsDefaultMeasurements || saveAsLatestMeasurements);
 
     if (!deadline || isNaN(new Date(deadline).getTime())) {
       return res.status(400).json({
@@ -308,7 +311,7 @@ export const createOrder = async (req, res, next) => {
 
       // If tailor asked to update latest measurements
       // Safeguard: Do not overwrite garment measurements if quantity is 0!
-      if (saveAsLatestMeasurements) {
+      if (shouldSaveDefaults) {
         const existingLm = targetCustomer.latestMeasurements || {};
         targetCustomer.latestMeasurements = {
           unit: measurementUnit || existingLm.unit || 'inch',
@@ -383,6 +386,9 @@ export const updateOrder = async (req, res, next) => {
   try {
     const { id } = req.params;
     const {
+      customerId,
+      customerDetails,
+      orderDate,
       deadline,
       deliveryTime,
       status,
@@ -390,16 +396,84 @@ export const updateOrder = async (req, res, next) => {
       shirt,
       pant,
       specialInstructions,
+      saveAsDefaultMeasurements = false,
+      saveAsLatestMeasurements = false,
     } = req.body;
 
-    const order = await Order.findOne({ _id: id, tenantId: req.user.tenantId });
+    const tenantId = req.user.tenantId;
+    const order = await Order.findOne({ _id: id, tenantId });
     if (!order) {
       return res.status(404).json({
         success: false,
-        message: 'Order not found',
+        message: 'Order not found or belongs to another business',
       });
     }
 
+    // 1. Handle Customer Update / Modification
+    if (customerId && String(customerId) !== String(order.customer)) {
+      const targetCustomer = await Customer.findOne({ _id: customerId, tenantId });
+      if (!targetCustomer) {
+        return res.status(404).json({
+          success: false,
+          message: 'Selected customer not found or belongs to another business',
+        });
+      }
+      order.customer = targetCustomer._id;
+      order.customerSnapshot = {
+        name: targetCustomer.name,
+        mobileNumber: targetCustomer.mobileNumber,
+        address: targetCustomer.address || '',
+      };
+    }
+
+    if (customerDetails) {
+      const currentCustomer = await Customer.findOne({ _id: order.customer, tenantId });
+      if (currentCustomer) {
+        let customerModified = false;
+        if (customerDetails.name && customerDetails.name.trim() && customerDetails.name.trim() !== currentCustomer.name) {
+          currentCustomer.name = customerDetails.name.trim();
+          customerModified = true;
+        }
+        if (customerDetails.mobileNumber) {
+          const cleanMobile = String(customerDetails.mobileNumber).replace(/\D/g, '').trim();
+          if (cleanMobile.length === 10 && cleanMobile !== currentCustomer.mobileNumber) {
+            // Verify mobile uniqueness within tenant
+            const duplicateMobile = await Customer.findOne({
+              tenantId,
+              mobileNumber: cleanMobile,
+              _id: { $ne: currentCustomer._id },
+            });
+            if (duplicateMobile) {
+              return res.status(400).json({
+                success: false,
+                message: `Mobile number ${cleanMobile} is already used by customer "${duplicateMobile.name}".`,
+              });
+            }
+            currentCustomer.mobileNumber = cleanMobile;
+            customerModified = true;
+          }
+        }
+        if (customerDetails.address !== undefined && customerDetails.address.trim() !== currentCustomer.address) {
+          currentCustomer.address = customerDetails.address.trim();
+          customerModified = true;
+        }
+
+        if (customerModified) {
+          await currentCustomer.save();
+        }
+
+        order.customerSnapshot = {
+          name: currentCustomer.name,
+          mobileNumber: currentCustomer.mobileNumber,
+          address: currentCustomer.address || '',
+        };
+      }
+    }
+
+    // 2. Order Dates
+    if (orderDate && !isNaN(new Date(orderDate).getTime())) {
+      order.orderDate = new Date(orderDate);
+    }
     if (deadline) {
       if (isNaN(new Date(deadline).getTime())) {
         return res.status(400).json({ success: false, message: 'Valid deadline is required' });
@@ -407,6 +481,8 @@ export const updateOrder = async (req, res, next) => {
       order.deadline = new Date(deadline);
     }
     if (deliveryTime !== undefined) order.deliveryTime = deliveryTime;
+
+    // 3. Status Update
     if (status) {
       if (status === 'pending') {
         return res.status(400).json({
@@ -420,6 +496,7 @@ export const updateOrder = async (req, res, next) => {
     }
     if (measurementUnit) order.measurementUnit = measurementUnit;
 
+    // 4. Shirt Garment & Measurement Snapshot Update
     if (shirt) {
       const existingShirt = order.shirt ? order.shirt.toObject() : {};
       const sQty = shirt.quantity !== undefined
@@ -458,6 +535,7 @@ export const updateOrder = async (req, res, next) => {
       }
     }
 
+    // 5. Pant Garment & Measurement Snapshot Update
     if (pant) {
       const existingPant = order.pant ? order.pant.toObject() : {};
       const pQty = pant.quantity !== undefined
@@ -527,11 +605,35 @@ export const updateOrder = async (req, res, next) => {
       order.specialInstructions = specialInstructions ? specialInstructions.trim() : '';
     }
 
+    // 6. Explicit Default Customer Measurements Update
+    // Do NOT automatically overwrite customer measurements unless user explicitly checked option
+    const shouldSaveAsCustomerDefaults = Boolean(saveAsDefaultMeasurements || saveAsLatestMeasurements);
+    if (shouldSaveAsCustomerDefaults && order.customer) {
+      const targetCustomer = await Customer.findOne({ _id: order.customer, tenantId });
+      if (targetCustomer) {
+        const existingLm = targetCustomer.latestMeasurements || {};
+        targetCustomer.latestMeasurements = {
+          unit: order.measurementUnit || existingLm.unit || 'inch',
+          shirt: order.shirt?.quantity > 0 ? (order.shirt.measurements || {}) : (existingLm.shirt || {}),
+          shirtPatterns: order.shirt?.quantity > 0 ? (order.shirt.patterns || []) : (existingLm.shirtPatterns || []),
+          shirtPattern: order.shirt?.quantity > 0 ? (order.shirt.pattern || '') : (existingLm.shirtPattern || ''),
+          shirtCustomPattern: order.shirt?.quantity > 0 ? (order.shirt.customPattern || '') : (existingLm.shirtCustomPattern || ''),
+          pant: order.pant?.quantity > 0 ? (order.pant.measurements || {}) : (existingLm.pant || {}),
+          pantPatterns: order.pant?.quantity > 0 ? (order.pant.patterns || []) : (existingLm.pantPatterns || []),
+          pantPattern: order.pant?.quantity > 0 ? (order.pant.pattern || '') : (existingLm.pantPattern || ''),
+          pantCustomPattern: order.pant?.quantity > 0 ? (order.pant.customPattern || '') : (existingLm.pantCustomPattern || ''),
+          updatedAt: new Date(),
+        };
+        await targetCustomer.save();
+      }
+    }
+
     await order.save();
+    await order.populate('customer');
 
     return res.json({
       success: true,
-      message: 'Order updated successfully',
+      message: `Order #${order.orderNumber} updated successfully`,
       data: order,
     });
   } catch (error) {

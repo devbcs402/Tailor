@@ -243,6 +243,10 @@ export const createTenant = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Mobile number must be exactly 10 digits' });
     }
 
+    if (adminPassword && adminPassword.trim().length < 8) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 8 characters long' });
+    }
+
     // Check if user account with this email already exists
     const existingUser = await User.findOne({ email: cleanEmail });
     if (existingUser) {
@@ -827,7 +831,7 @@ export const resetTenantAdminPassword = async (req, res, next) => {
     } else if (tempPassword.length < 8) {
       return res.status(400).json({
         success: false,
-        message: 'Temporary password must be at least 8 characters long.',
+        message: 'Password must be at least 8 characters long',
       });
     }
 

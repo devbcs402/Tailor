@@ -77,6 +77,11 @@ export const OwnerCreateTenantPage = () => {
       return;
     }
 
+    if (formData.adminPassword && formData.adminPassword.trim().length < 8) {
+      setError('Password must be at least 8 characters long.');
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await ownerApi.createTenant({

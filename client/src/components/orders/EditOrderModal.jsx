@@ -25,6 +25,7 @@ export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
   const [pantMeasurements, setPantMeasurements] = useState({});
   const [pantErrors, setPantErrors] = useState({});
 
+  const [saveAsDefaultMeasurements, setSaveAsDefaultMeasurements] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState('');
 
@@ -50,6 +51,7 @@ export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
       setPantCustomPattern(order.pant?.customPattern || '');
       setPantMeasurements(order.pant?.measurements ? { ...order.pant.measurements } : {});
 
+      setSaveAsDefaultMeasurements(false);
       setValidationError('');
     }
   }, [order]);
@@ -137,6 +139,7 @@ export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
         deadline,
         deliveryTime,
         specialInstructions,
+        saveAsDefaultMeasurements: Boolean(saveAsDefaultMeasurements),
         shirt: {
           quantity: sQty,
           patterns: sQty > 0 ? shirtPatterns : [],
@@ -333,6 +336,36 @@ export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
                 onChange={(e) => setSpecialInstructions(e.target.value)}
                 rows={2}
               />
+            </div>
+          </div>
+
+          {/* Checkbox: Save as Customer's Default Measurements */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '10px',
+              padding: '12px 14px',
+              backgroundColor: '#f8fafc',
+              borderRadius: '8px',
+              border: '1.5px solid #e2e8f0',
+              marginTop: '4px',
+            }}
+          >
+            <input
+              type="checkbox"
+              id="modalSaveDefaultMeasurements"
+              checked={saveAsDefaultMeasurements}
+              onChange={(e) => setSaveAsDefaultMeasurements(e.target.checked)}
+              style={{ width: '18px', height: '18px', marginTop: '2px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+            />
+            <div>
+              <label htmlFor="modalSaveDefaultMeasurements" style={{ fontSize: '0.88rem', color: '#0f172a', fontWeight: 700, cursor: 'pointer' }}>
+                Save as Customer's Default Measurements
+              </label>
+              <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>
+                If checked, this customer's saved profile measurements will also be updated. If unchecked, only this order's snapshot is updated.
+              </div>
             </div>
           </div>
 

@@ -105,7 +105,7 @@ export const OrderDetailsPage = () => {
 
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button
-            onClick={() => setShowEditModal(true)}
+            onClick={() => navigate(`/orders/${order._id}/edit`)}
             className="btn btn-outline btn-sm"
             style={{ display: 'flex', alignItems: 'center', gap: '6px', borderColor: 'var(--accent-gold)', color: 'var(--primary)' }}
           >

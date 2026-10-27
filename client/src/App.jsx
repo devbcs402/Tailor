@@ -62,6 +62,7 @@ export function App() {
                 <Route path="/orders/create" element={<CreateOrderPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
                 <Route path="/orders/:id" element={<OrderDetailsPage />} />
+                <Route path="/orders/:id/edit" element={<CreateOrderPage isEdit={true} />} />
                 <Route path="/customers" element={<CustomersPage />} />
                 <Route path="/customers/:id" element={<CustomerDetailsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />

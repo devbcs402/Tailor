@@ -236,7 +236,13 @@ export const ShirtMeasurements = ({
             >
               <div className="measure-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ color: hasError ? '#dc2626' : (isAvailable ? '#475569' : '#94a3b8'), fontWeight: 600 }}>
-                  {f.label} {f.required && isAvailable && <span style={{ color: '#dc2626', fontWeight: 800 }}>*</span>}
+                  {f.label}{' '}
+                  {f.gujaratiLabel && (
+                    <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
+                      ({f.gujaratiLabel})
+                    </span>
+                  )}{' '}
+                  {f.required && isAvailable && <span style={{ color: '#dc2626', fontWeight: 800 }}>*</span>}
                 </span>
               </div>
               <input

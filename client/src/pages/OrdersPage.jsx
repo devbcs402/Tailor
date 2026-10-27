@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus,
   Eye,
+  Edit2,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -450,6 +451,15 @@ export const OrdersPage = () => {
                               aria-label={`View order ${o.orderNumber}`}
                             >
                               <Eye size={15} />
+                            </button>
+                            <button
+                              onClick={() => navigate(`/orders/${o._id}/edit`)}
+                              className="btn btn-outline btn-sm"
+                              style={{ padding: '4px 8px', color: 'var(--primary)', borderColor: 'var(--border-light)' }}
+                              title="Edit Order"
+                              aria-label={`Edit order ${o.orderNumber}`}
+                            >
+                              <Edit2 size={15} />
                             </button>
                             <button
                               onClick={() => setPrintSlipOrder(o)}

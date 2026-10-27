@@ -17,6 +17,7 @@ router.get('/', getOrders);
 router.post('/', createOrder);
 router.get('/:id', getOrderById);
 router.patch('/:id', updateOrder);
+router.put('/:id', updateOrder);
 router.patch('/:id/status', updateOrderStatus);
 router.delete('/:id', deleteOrder);
 

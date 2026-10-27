@@ -132,10 +132,17 @@ export const OwnerTenantDetailsPage = () => {
   const handleResetAdminPassword = async (e) => {
     e.preventDefault();
     if (!tenant) return;
+    if (resetPasswordModal.tempPassword && resetPasswordModal.tempPassword.trim().length < 8) {
+      setResetPasswordModal((prev) => ({
+        ...prev,
+        error: 'Password must be at least 8 characters long.',
+      }));
+      return;
+    }
     try {
       setResetPasswordModal((prev) => ({ ...prev, loading: true, error: '' }));
       const res = await ownerApi.resetTenantAdminPassword(tenant._id, {
-        newPassword: resetPasswordModal.tempPassword || undefined,
+        newPassword: resetPasswordModal.tempPassword ? resetPasswordModal.tempPassword.trim() : undefined,
       });
       if (res?.success && res?.data) {
         setResetPasswordModal((prev) => ({
