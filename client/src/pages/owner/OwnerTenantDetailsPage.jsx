@@ -21,6 +21,7 @@ import {
   Layers,
   Trash2,
   RotateCcw,
+  Archive,
 } from 'lucide-react';
 import { ownerApi } from '../../api/ownerApi';
 import { EditTenantModal } from '../../components/owner/EditTenantModal';
@@ -74,7 +75,7 @@ export const OwnerTenantDetailsPage = () => {
     const { type, reason } = confirmDialog;
 
     try {
-      setConfirmDialog((prev) => ({ ...prev, loading: true }));
+      setConfirmDialog((prev) => ({ ...prev, loading: true, error: '' }));
       let res;
       if (type === 'deactivate') {
         res = await ownerApi.deactivateTenant(tenant._id, reason || 'Suspended by platform administrator');
@@ -84,9 +85,16 @@ export const OwnerTenantDetailsPage = () => {
         res = await ownerApi.archiveTenant(tenant._id, reason || 'Archived by platform administrator');
       } else if (type === 'restore') {
         res = await ownerApi.restoreTenant(tenant._id);
+      } else if (type === 'delete') {
+        res = await ownerApi.deleteTenant(tenant._id);
       }
 
       if (res?.success) {
+        if (type === 'delete') {
+          navigate('/owner/tenants');
+          return;
+        }
+
         let msg = `Tenant "${tenant.businessName}" status updated.`;
         if (type === 'deactivate') msg = `Tenant "${tenant.businessName}" has been suspended.`;
         if (type === 'activate') msg = `Tenant "${tenant.businessName}" has been reactivated.`;
@@ -95,16 +103,16 @@ export const OwnerTenantDetailsPage = () => {
 
         setSuccessMessage(msg);
         setTimeout(() => setSuccessMessage(''), 5000);
-        setConfirmDialog({ isOpen: false, type: 'deactivate', loading: false, reason: '' });
+        setConfirmDialog({ isOpen: false, type: 'deactivate', loading: false, reason: '', error: '' });
         fetchTenantDetails();
       } else {
-        alert(res?.message || 'Operation failed');
-        setConfirmDialog((prev) => ({ ...prev, loading: false }));
+        const errMsg = res?.message || 'Operation failed';
+        setConfirmDialog((prev) => ({ ...prev, loading: false, error: errMsg }));
       }
     } catch (err) {
       console.error('Action failed:', err);
-      alert(err.message || 'Failed to execute status change');
-      setConfirmDialog((prev) => ({ ...prev, loading: false }));
+      const errMsg = err.message || 'Failed to execute status change';
+      setConfirmDialog((prev) => ({ ...prev, loading: false, error: errMsg }));
     }
   };
 
@@ -313,7 +321,7 @@ export const OwnerTenantDetailsPage = () => {
             </button>
           ) : (
             <button
-              onClick={() => setConfirmDialog({ isOpen: true, type: 'archive', loading: false, reason: '' })}
+              onClick={() => setConfirmDialog({ isOpen: true, type: 'archive', loading: false, reason: '', error: '' })}
               className="btn btn-outline"
               style={{
                 display: 'inline-flex',
@@ -324,10 +332,27 @@ export const OwnerTenantDetailsPage = () => {
                 backgroundColor: '#f8fafc',
               }}
             >
-              <Trash2 size={16} />
-              Archive / Delete
+              <Archive size={16} />
+              Archive Tenant
             </button>
           )}
+
+          {/* Dedicated Permanent Delete Action */}
+          <button
+            onClick={() => setConfirmDialog({ isOpen: true, type: 'delete', loading: false, reason: '', error: '' })}
+            className="btn btn-outline"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              borderColor: '#ef4444',
+              color: '#dc2626',
+              backgroundColor: '#fef2f2',
+            }}
+          >
+            <Trash2 size={16} />
+            Delete Tenant
+          </button>
         </div>
       </div>
 
@@ -810,7 +835,9 @@ export const OwnerTenantDetailsPage = () => {
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
         title={
-          confirmDialog.type === 'archive'
+          confirmDialog.type === 'delete'
+            ? `Permanently Delete "${tenant.businessName}"?`
+            : confirmDialog.type === 'archive'
             ? `Archive Tenant "${tenant.businessName}"?`
             : confirmDialog.type === 'restore'
             ? `Restore Tenant "${tenant.businessName}"?`
@@ -819,7 +846,9 @@ export const OwnerTenantDetailsPage = () => {
             : `Reactivate "${tenant.businessName}"?`
         }
         message={
-          confirmDialog.type === 'archive'
+          confirmDialog.type === 'delete'
+            ? `⚠️ CRITICAL WARNING: You are about to permanently delete "${tenant.businessName}" (Code: ${tenant.tenantCode}). This action is destructive and irreversible. Deleting this tenant will permanently remove all associated business data: all customer records and measurement profiles, orders, pattern templates, staff accounts, and sequence counters. Other tenants and platform data will remain unaffected.`
+            : confirmDialog.type === 'archive'
             ? `This action will safely archive "${tenant.businessName}" and immediately revoke login access. ALL customer profiles, measurement records, and historical orders are permanently preserved in MongoDB. The platform owner can restore this studio at any time.`
             : confirmDialog.type === 'restore'
             ? `Restoring "${tenant.businessName}" will immediately restore active status and allow staff to resume operations.`
@@ -828,7 +857,9 @@ export const OwnerTenantDetailsPage = () => {
             : `Reactivating this tenant will restore immediate business API access and allow staff to resume operations.`
         }
         confirmText={
-          confirmDialog.type === 'archive'
+          confirmDialog.type === 'delete'
+            ? 'Delete Tenant & All Associated Data'
+            : confirmDialog.type === 'archive'
             ? 'Archive Tenant Safely'
             : confirmDialog.type === 'restore'
             ? 'Restore to Active'
@@ -836,10 +867,11 @@ export const OwnerTenantDetailsPage = () => {
             ? 'Suspend Tenant Access'
             : 'Reactivate Tenant Access'
         }
-        confirmVariant={confirmDialog.type === 'archive' || confirmDialog.type === 'deactivate' ? 'danger' : 'primary'}
+        danger={confirmDialog.type === 'delete' || confirmDialog.type === 'archive' || confirmDialog.type === 'deactivate'}
         loading={confirmDialog.loading}
+        error={confirmDialog.error}
         onConfirm={handleConfirmAction}
-        onCancel={() => setConfirmDialog({ isOpen: false, type: 'deactivate', loading: false, reason: '' })}
+        onClose={() => !confirmDialog.loading && setConfirmDialog({ isOpen: false, type: 'deactivate', loading: false, reason: '', error: '' })}
       />
     </div>
   );

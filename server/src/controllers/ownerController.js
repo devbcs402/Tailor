@@ -3,6 +3,8 @@ import { Tenant } from '../models/Tenant.js';
 import { User } from '../models/User.js';
 import { Customer } from '../models/Customer.js';
 import { Order } from '../models/Order.js';
+import { Pattern } from '../models/Pattern.js';
+import { OrderCounter } from '../models/OrderCounter.js';
 import { AuditLog } from '../models/AuditLog.js';
 import { seedTenantDefaultPatterns } from './patternController.js';
 
@@ -130,9 +132,23 @@ export const getTenants = async (req, res, next) => {
       ordersCount: orderCountMap.get(String(t._id)) || 0,
     }));
 
+    // Calculate summary statistics across all tenants
+    const [totalAll, totalActive, totalInactive, totalArchived] = await Promise.all([
+      Tenant.countDocuments(),
+      Tenant.countDocuments({ status: 'active' }),
+      Tenant.countDocuments({ status: 'inactive' }),
+      Tenant.countDocuments({ status: 'archived' }),
+    ]);
+
     return res.json({
       success: true,
       data: enrichedTenants,
+      summary: {
+        total: totalAll,
+        active: totalActive,
+        inactive: totalInactive,
+        archived: totalArchived,
+      },
       pagination: {
         total,
         totalRecords: total,
@@ -579,6 +595,180 @@ export const restoreTenant = async (req, res, next) => {
       success: true,
       message: `Tenant "${tenant.businessName}" has been restored to active status.`,
       data: tenant,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Permanently Delete Tenant and All Associated Business Data
+ * Atomic cascade deletion with transaction support and staged fallback.
+ * Deletes: Orders, Customers (with measurements), Patterns, OrderCounters, and tenant Users.
+ * Strictly preserves platform owners and records of other tenants.
+ */
+export const deleteTenant = async (req, res, next) => {
+  let session = null;
+  let useTransaction = false;
+
+  try {
+    const { id } = req.params;
+
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid tenant ID format provided.',
+      });
+    }
+
+    const tenant = await Tenant.findById(id);
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tenant not found or has already been deleted.',
+      });
+    }
+
+    // Safety check: Prevent deleting tenant associated with current platform owner's active session
+    if (req.user.tenantId && String(req.user.tenantId) === String(tenant._id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete the tenant corresponding to the currently active session.',
+      });
+    }
+
+    // Check transaction support
+    try {
+      session = await mongoose.startSession();
+      session.startTransaction();
+      useTransaction = true;
+    } catch (sessionErr) {
+      if (session) {
+        await session.endSession();
+        session = null;
+      }
+      useTransaction = false;
+      console.warn('[Tenant Deletion] MongoDB replica set transactions unavailable, falling back to staged safe deletion.');
+    }
+
+    let deletedOrdersCount = 0;
+    let deletedCustomersCount = 0;
+    let deletedPatternsCount = 0;
+    let deletedCountersCount = 0;
+    let deletedUsersCount = 0;
+
+    if (useTransaction) {
+      try {
+        // 1. Delete Orders belonging strictly to this tenant
+        const orderResult = await Order.deleteMany({ tenantId: tenant._id }).session(session);
+        deletedOrdersCount = orderResult.deletedCount;
+
+        // 2. Delete Customers (including embedded measurement profiles) belonging strictly to this tenant
+        const customerResult = await Customer.deleteMany({ tenantId: tenant._id }).session(session);
+        deletedCustomersCount = customerResult.deletedCount;
+
+        // 3. Delete Patterns belonging strictly to this tenant
+        const patternResult = await Pattern.deleteMany({ tenantId: tenant._id }).session(session);
+        deletedPatternsCount = patternResult.deletedCount;
+
+        // 4. Delete OrderCounters for this tenant
+        const counterResult = await OrderCounter.deleteMany({
+          name: new RegExp(`^order_seq_${tenant._id}_`),
+        }).session(session);
+        deletedCountersCount = counterResult.deletedCount;
+
+        // 5. Delete Users belonging to this tenant, strictly guarding against deleting any platform owner
+        const userResult = await User.deleteMany({
+          tenantId: tenant._id,
+          role: { $ne: 'platform_owner' },
+        }).session(session);
+        deletedUsersCount = userResult.deletedCount;
+
+        // 6. Delete Tenant document
+        await Tenant.findByIdAndDelete(tenant._id).session(session);
+
+        await session.commitTransaction();
+      } catch (txError) {
+        await session.abortTransaction();
+        throw txError;
+      } finally {
+        await session.endSession();
+      }
+    } else {
+      // Safe staged deletion without transactions
+      // Stage 1: Mark status as 'deleting' to block new incoming operations
+      tenant.status = 'deleting';
+      await tenant.save();
+
+      // Stage 2: Cascade delete related documents in dependency order
+      const orderResult = await Order.deleteMany({ tenantId: tenant._id });
+      deletedOrdersCount = orderResult.deletedCount;
+
+      const customerResult = await Customer.deleteMany({ tenantId: tenant._id });
+      deletedCustomersCount = customerResult.deletedCount;
+
+      const patternResult = await Pattern.deleteMany({ tenantId: tenant._id });
+      deletedPatternsCount = patternResult.deletedCount;
+
+      const counterResult = await OrderCounter.deleteMany({
+        name: new RegExp(`^order_seq_${tenant._id}_`),
+      });
+      deletedCountersCount = counterResult.deletedCount;
+
+      const userResult = await User.deleteMany({
+        tenantId: tenant._id,
+        role: { $ne: 'platform_owner' },
+      });
+      deletedUsersCount = userResult.deletedCount;
+
+      // Stage 3: Delete Tenant document
+      await Tenant.findByIdAndDelete(tenant._id);
+    }
+
+    // Record Audit Log (preserved for platform owner compliance audit trace)
+    try {
+      await AuditLog.create({
+        actor: req.user._id,
+        actorEmail: req.user.email,
+        actorRole: req.user.role,
+        action: 'tenant_deleted',
+        targetTenant: tenant._id,
+        targetTenantName: tenant.businessName,
+        details: {
+          tenantCode: tenant.tenantCode,
+          ownerName: tenant.ownerName,
+          email: tenant.email,
+          mobileNumber: tenant.mobileNumber,
+          deletedCounts: {
+            orders: deletedOrdersCount,
+            customers: deletedCustomersCount,
+            patterns: deletedPatternsCount,
+            users: deletedUsersCount,
+            counters: deletedCountersCount,
+          },
+          deletedAt: new Date(),
+        },
+        ipAddress: req.ip || '',
+        userAgent: req.headers['user-agent'] || '',
+      });
+    } catch (auditErr) {
+      console.warn('[Audit Warning] Could not record tenant_deleted audit:', auditErr.message);
+    }
+
+    return res.json({
+      success: true,
+      message: `Tenant "${tenant.businessName}" and all associated business data (${deletedOrdersCount} orders, ${deletedCustomersCount} customers, ${deletedUsersCount} staff) were permanently deleted.`,
+      data: {
+        tenantId: tenant._id,
+        businessName: tenant.businessName,
+        deletedCounts: {
+          orders: deletedOrdersCount,
+          customers: deletedCustomersCount,
+          patterns: deletedPatternsCount,
+          users: deletedUsersCount,
+          counters: deletedCountersCount,
+        },
+      },
     });
   } catch (error) {
     next(error);

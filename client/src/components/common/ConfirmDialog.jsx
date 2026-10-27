@@ -11,6 +11,7 @@ export const ConfirmDialog = ({
   cancelText = 'Cancel',
   danger = true,
   loading = false,
+  error = '',
 }) => {
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -84,6 +85,22 @@ export const ConfirmDialog = ({
             <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.4 }}>
               {message}
             </p>
+            {error && (
+              <div
+                style={{
+                  marginTop: '12px',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  backgroundColor: '#fee2e2',
+                  border: '1px solid #fecaca',
+                  color: '#991b1b',
+                  fontSize: '0.82rem',
+                  fontWeight: 500,
+                }}
+              >
+                {error}
+              </div>
+            )}
           </div>
 
           <button

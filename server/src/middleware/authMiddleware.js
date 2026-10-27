@@ -40,12 +40,15 @@ export const requireAuth = async (req, res, next) => {
         });
       }
 
-      if (tenant.status === 'inactive' || tenant.status === 'archived') {
+      if (tenant.status === 'inactive' || tenant.status === 'archived' || tenant.status === 'deleting') {
         const isArchived = tenant.status === 'archived';
+        const isDeleting = tenant.status === 'deleting';
         return res.status(403).json({
           success: false,
-          code: isArchived ? 'TENANT_ARCHIVED' : 'TENANT_INACTIVE',
-          message: `Your business account has been ${isArchived ? 'archived' : 'deactivated'}. Please contact platform support.`,
+          code: isArchived ? 'TENANT_ARCHIVED' : isDeleting ? 'TENANT_DELETING' : 'TENANT_INACTIVE',
+          message: isDeleting
+            ? 'This business account is undergoing deletion. Access is revoked.'
+            : `Your business account has been ${isArchived ? 'archived' : 'deactivated'}. Please contact platform support.`,
         });
       }
 

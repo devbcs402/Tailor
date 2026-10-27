@@ -54,7 +54,7 @@ const tenantSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'inactive', 'archived'],
+      enum: ['active', 'inactive', 'archived', 'deleting'],
       default: 'active',
       index: true,
     },

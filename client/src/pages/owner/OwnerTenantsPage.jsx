@@ -16,6 +16,7 @@ import {
   FileText,
   Trash2,
   RotateCcw,
+  Archive,
 } from 'lucide-react';
 import { ownerApi } from '../../api/ownerApi';
 import { CreateTenantModal } from '../../components/owner/CreateTenantModal';
@@ -28,6 +29,12 @@ export const OwnerTenantsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [summaryStats, setSummaryStats] = useState({
+    total: 0,
+    active: 0,
+    inactive: 0,
+    archived: 0,
+  });
 
   // Filters & Pagination
   const [search, setSearch] = useState('');
@@ -42,13 +49,14 @@ export const OwnerTenantsPage = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingTenant, setEditingTenant] = useState(null);
 
-  // Confirm dialog state for Activate / Deactivate
+  // Confirm dialog state for Activate / Deactivate / Archive / Restore / Delete
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
-    type: 'deactivate', // 'deactivate' or 'activate'
+    type: 'deactivate',
     tenant: null,
     loading: false,
     reason: '',
+    error: '',
   });
 
   const fetchTenants = useCallback(async () => {
@@ -66,6 +74,9 @@ export const OwnerTenantsPage = () => {
       const res = await ownerApi.getTenants(params);
       if (res?.success && res?.data) {
         setTenants(res.data || []);
+        if (res.summary) {
+          setSummaryStats(res.summary);
+        }
         if (res.pagination) {
           setTotalPages(res.pagination.totalPages || 1);
           setTotalRecords(res.pagination.totalRecords || res.pagination.total || 0);
@@ -110,6 +121,7 @@ export const OwnerTenantsPage = () => {
       tenant,
       loading: false,
       reason: '',
+      error: '',
     });
   };
 
@@ -120,6 +132,7 @@ export const OwnerTenantsPage = () => {
       tenant,
       loading: false,
       reason: '',
+      error: '',
     });
   };
 
@@ -130,6 +143,7 @@ export const OwnerTenantsPage = () => {
       tenant,
       loading: false,
       reason: '',
+      error: '',
     });
   };
 
@@ -140,6 +154,18 @@ export const OwnerTenantsPage = () => {
       tenant,
       loading: false,
       reason: '',
+      error: '',
+    });
+  };
+
+  const openDeleteConfirm = (tenant) => {
+    setConfirmDialog({
+      isOpen: true,
+      type: 'delete',
+      tenant,
+      loading: false,
+      reason: '',
+      error: '',
     });
   };
 
@@ -148,7 +174,7 @@ export const OwnerTenantsPage = () => {
     if (!tenant) return;
 
     try {
-      setConfirmDialog((prev) => ({ ...prev, loading: true }));
+      setConfirmDialog((prev) => ({ ...prev, loading: true, error: '' }));
       let res;
       if (type === 'deactivate') {
         res = await ownerApi.deactivateTenant(tenant._id, reason || 'Suspended by platform administrator');
@@ -158,6 +184,8 @@ export const OwnerTenantsPage = () => {
         res = await ownerApi.archiveTenant(tenant._id, reason || 'Archived by platform administrator');
       } else if (type === 'restore') {
         res = await ownerApi.restoreTenant(tenant._id);
+      } else if (type === 'delete') {
+        res = await ownerApi.deleteTenant(tenant._id);
       }
 
       if (res?.success) {
@@ -166,19 +194,28 @@ export const OwnerTenantsPage = () => {
         if (type === 'activate') msg = `Tenant "${tenant.businessName}" has been reactivated.`;
         if (type === 'archive') msg = `Tenant "${tenant.businessName}" has been safely archived. All historical customer & order data preserved.`;
         if (type === 'restore') msg = `Tenant "${tenant.businessName}" has been restored to active status.`;
+        if (type === 'delete') msg = res?.message || `Tenant "${tenant.businessName}" and all associated data were permanently deleted.`;
 
         setSuccessMessage(msg);
-        setTimeout(() => setSuccessMessage(''), 5000);
-        setConfirmDialog({ isOpen: false, type: 'deactivate', tenant: null, loading: false, reason: '' });
-        fetchTenants();
+        setTimeout(() => setSuccessMessage(''), 6000);
+        setConfirmDialog({ isOpen: false, type: 'delete', tenant: null, loading: false, reason: '', error: '' });
+
+        // Handle pagination when the last tenant on a page is deleted
+        if (type === 'delete' && tenants.length === 1 && page > 1) {
+          setPage((prevPage) => prevPage - 1);
+        } else {
+          fetchTenants();
+        }
       } else {
-        alert(res?.message || 'Operation failed');
-        setConfirmDialog((prev) => ({ ...prev, loading: false }));
+        const errMsg = res?.message || 'Operation failed';
+        setConfirmDialog((prev) => ({ ...prev, loading: false, error: errMsg }));
+        setError(errMsg);
       }
     } catch (err) {
       console.error('Action failed:', err);
-      alert(err.message || 'Failed to execute status change');
-      setConfirmDialog((prev) => ({ ...prev, loading: false }));
+      const errMsg = err.message || 'Failed to execute status change';
+      setConfirmDialog((prev) => ({ ...prev, loading: false, error: errMsg }));
+      setError(errMsg);
     }
   };
 
@@ -249,6 +286,136 @@ export const OwnerTenantsPage = () => {
             <Plus size={18} />
             Onboard Tenant
           </Link>
+        </div>
+      </div>
+
+      {/* Real-time Platform Tenant Metrics */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+          gap: '16px',
+          marginBottom: '24px',
+        }}
+      >
+        {/* Total Tenants */}
+        <div
+          onClick={() => { setStatusFilter('all'); setPage(1); }}
+          title="Filter All Tenants"
+          style={{
+            padding: '16px 20px',
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            border: statusFilter === 'all' ? '2px solid #0b1f3a' : '1px solid #e2e8f0',
+            cursor: 'pointer',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <div>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+              Total Tenants
+            </span>
+            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0b1f3a', marginTop: '2px' }}>
+              {summaryStats.total}
+            </div>
+          </div>
+          <div style={{ padding: '10px', borderRadius: '10px', backgroundColor: '#f1f5f9', color: '#0b1f3a' }}>
+            <Building2 size={22} />
+          </div>
+        </div>
+
+        {/* Active Tenants */}
+        <div
+          onClick={() => { setStatusFilter('active'); setPage(1); }}
+          title="Filter Active Tenants"
+          style={{
+            padding: '16px 20px',
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            border: statusFilter === 'active' ? '2px solid #16a34a' : '1px solid #e2e8f0',
+            cursor: 'pointer',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <div>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#16a34a', textTransform: 'uppercase' }}>
+              Active
+            </span>
+            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#16a34a', marginTop: '2px' }}>
+              {summaryStats.active}
+            </div>
+          </div>
+          <div style={{ padding: '10px', borderRadius: '10px', backgroundColor: '#dcfce7', color: '#16a34a' }}>
+            <CheckCircle2 size={22} />
+          </div>
+        </div>
+
+        {/* Suspended Tenants */}
+        <div
+          onClick={() => { setStatusFilter('inactive'); setPage(1); }}
+          title="Filter Suspended Tenants"
+          style={{
+            padding: '16px 20px',
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            border: statusFilter === 'inactive' ? '2px solid #dc2626' : '1px solid #e2e8f0',
+            cursor: 'pointer',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <div>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#dc2626', textTransform: 'uppercase' }}>
+              Suspended
+            </span>
+            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#dc2626', marginTop: '2px' }}>
+              {summaryStats.inactive}
+            </div>
+          </div>
+          <div style={{ padding: '10px', borderRadius: '10px', backgroundColor: '#fee2e2', color: '#dc2626' }}>
+            <Ban size={22} />
+          </div>
+        </div>
+
+        {/* Archived Tenants */}
+        <div
+          onClick={() => { setStatusFilter('archived'); setPage(1); }}
+          title="Filter Archived Tenants"
+          style={{
+            padding: '16px 20px',
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            border: statusFilter === 'archived' ? '2px solid #d97706' : '1px solid #e2e8f0',
+            cursor: 'pointer',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <div>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#d97706', textTransform: 'uppercase' }}>
+              Archived
+            </span>
+            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#d97706', marginTop: '2px' }}>
+              {summaryStats.archived}
+            </div>
+          </div>
+          <div style={{ padding: '10px', borderRadius: '10px', backgroundColor: '#fef3c7', color: '#d97706' }}>
+            <Archive size={22} />
+          </div>
         </div>
       </div>
 
@@ -682,7 +849,7 @@ export const OwnerTenantsPage = () => {
                         ) : (
                           <button
                             onClick={() => openArchiveConfirm(t)}
-                            title="Safely Archive / Delete Tenant"
+                            title="Safely Archive Tenant"
                             style={{
                               padding: '6px 8px',
                               borderRadius: '6px',
@@ -694,9 +861,27 @@ export const OwnerTenantsPage = () => {
                               alignItems: 'center',
                             }}
                           >
-                            <Trash2 size={15} />
+                            <Archive size={15} />
                           </button>
                         )}
+
+                        {/* Permanent Delete Action - available for all tenants */}
+                        <button
+                          onClick={() => openDeleteConfirm(t)}
+                          title="Permanently Delete Tenant & All Business Data"
+                          style={{
+                            padding: '6px 8px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            backgroundColor: '#fee2e2',
+                            color: '#dc2626',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Trash2 size={15} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -750,11 +935,13 @@ export const OwnerTenantsPage = () => {
         isOpen={confirmDialog.isOpen}
         onClose={() =>
           !confirmDialog.loading &&
-          setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false, error: '' }))
         }
         onConfirm={handleConfirmAction}
         title={
-          confirmDialog.type === 'archive'
+          confirmDialog.type === 'delete'
+            ? `Permanently Delete: "${confirmDialog.tenant?.businessName}"?`
+            : confirmDialog.type === 'archive'
             ? `Archive Tenant: ${confirmDialog.tenant?.businessName}?`
             : confirmDialog.type === 'restore'
             ? `Restore Tenant: ${confirmDialog.tenant?.businessName}?`
@@ -763,7 +950,9 @@ export const OwnerTenantsPage = () => {
             : `Reactivate Tenant: ${confirmDialog.tenant?.businessName}`
         }
         message={
-          confirmDialog.type === 'archive'
+          confirmDialog.type === 'delete'
+            ? `⚠️ CRITICAL WARNING: You are about to permanently delete "${confirmDialog.tenant?.businessName}" (Code: ${confirmDialog.tenant?.tenantCode}). This action is destructive and irreversible. Deleting this tenant will permanently remove all associated business data belonging exclusively to this shop: all customer records, permanent measurement profiles, orders and historical snapshots, garment patterns, staff and admin accounts, and sequence counters. Other tenants and platform data will remain unaffected.`
+            : confirmDialog.type === 'archive'
             ? `This action will archive "${confirmDialog.tenant?.businessName}" and immediately revoke login access. ALL historical customer profiles, measurement records, and orders are permanently preserved in MongoDB. The platform owner can restore this studio at any time.`
             : confirmDialog.type === 'restore'
             ? `Restoring "${confirmDialog.tenant?.businessName}" will immediately restore active status and allow staff to resume operations.`
@@ -772,7 +961,9 @@ export const OwnerTenantsPage = () => {
             : `Reactivating "${confirmDialog.tenant?.businessName}" will restore immediate business operations access.`
         }
         confirmText={
-          confirmDialog.type === 'archive'
+          confirmDialog.type === 'delete'
+            ? 'Delete Tenant & All Associated Data'
+            : confirmDialog.type === 'archive'
             ? 'Archive Tenant Safely'
             : confirmDialog.type === 'restore'
             ? 'Restore Tenant'
@@ -781,8 +972,9 @@ export const OwnerTenantsPage = () => {
             : 'Activate Tenant'
         }
         cancelText="Cancel"
-        danger={confirmDialog.type === 'archive' || confirmDialog.type === 'deactivate'}
+        danger={confirmDialog.type === 'delete' || confirmDialog.type === 'archive' || confirmDialog.type === 'deactivate'}
         loading={confirmDialog.loading}
+        error={confirmDialog.error}
       />
     </div>
   );

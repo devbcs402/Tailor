@@ -185,27 +185,32 @@ When a tailoring business pauses their subscription or fails payment, the platfo
 
 ---
 
-## 8. How Tenant Archival/Deletion Works
+## 8. How Tenant Archival and Permanent Deletion Works
 
-The platform adopts a **Safe Archival Policy** to protect customer histories, accounting records, and garment measurements.
+The platform supports two tiers of tenant termination depending on the operational requirement:
 
-### Why Hard Cascade Deletion is Prohibited
+### Option A: Safe Archival (Soft Delete)
+For businesses pausing subscriptions or closing temporarily:
+1. In `/owner/tenants`, click the **Archive** button (`<Archive />`).
+2. An alert modal confirms the archival.
+3. The system sets `tenant.status = 'archived'` and disables user accounts.
+4. All customer records, order histories, and measurements are **permanently preserved** in MongoDB. The platform owner can restore the studio at any time.
 
-Tailoring businesses store custom body measurements, patterns, order histories, and advance financial payments. Deleting tenant records permanently would destroy legal financial records and customer histories.
-
-### Archival Workflow
-
-1. In `/owner/tenants`, click the tenant's row action menu `...` -> **Archive / Delete**.
-2. An alert modal explains the operation:
-   - The business status becomes `archived`.
-   - All tenant staff accounts are disabled.
-   - Customers and historical orders are preserved in MongoDB for legal and reporting retention.
-3. Provide an optional reason (e.g., "Business closed permanently") and click **Confirm Safe Archival**.
-4. The system:
-   - Sets `tenant.status = 'archived'`.
-   - Sets `tenant.archivedAt = new Date()`, `tenant.archivedBy = owner._id`, and `tenant.archiveReason`.
-   - Deactivates associated `User` accounts (`isActive: false`).
-   - Writes a `tenant_archived` record to `AuditLog`.
+### Option B: Permanent Tenant Deletion (Full Cascade Cleanup)
+When a platform owner explicitly deletes a tenant (e.g. fraudulent registration, test tenant cleanup, GDPR/compliance data erasure):
+1. In `/owner/tenants`, click the red **Delete** button (`<Trash2 />`).
+2. A prominent confirmation dialog displays the tenant's business name and code, warning that all associated data belonging exclusively to this shop will be permanently removed.
+3. Upon confirmation, the backend executes an atomic transaction (with safe staged fallback) via `DELETE /api/owner/tenants/:tenantId`:
+   - Validates platform-owner privileges (HTTP 403 for unauthorized users).
+   - Prevents deletion of the currently active session or platform owner accounts.
+   - Deletes all `Order` records belonging strictly to this tenant (`tenantId`).
+   - Deletes all `Customer` records and embedded measurement profiles belonging strictly to this tenant.
+   - Deletes all `Pattern` templates belonging strictly to this tenant.
+   - Deletes all `OrderCounter` sequence counters matching `order_seq_${tenantId}_*`.
+   - Deletes all `User` staff/admin accounts (`tenantId`, protecting `role: 'platform_owner'`).
+   - Deletes the `Tenant` document itself.
+   - Records a `tenant_deleted` event in `AuditLog` preserving an audit trace.
+4. The table and dashboard statistics immediately refresh without a full-page reload, and pagination automatically adjusts if the last tenant on a page is deleted.
 
 ---
 
