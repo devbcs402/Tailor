@@ -17,6 +17,41 @@ export const slugifyFieldKey = (name = '') => {
 };
 
 /**
+ * Re-sequence display orders for a tenant's category so positions are strictly sequential 1..N
+ * If a movedDocId and targetOrder are provided, the moved item is spliced into that target position.
+ */
+export const resequenceDefinitions = async (tenantId, category, movedDocId = null, targetOrder = null) => {
+  const allDocs = await MeasurementDefinition.find({
+    tenantId,
+    category,
+    isDeleted: { $ne: true },
+  }).sort({ displayOrder: 1, createdAt: 1, _id: 1 });
+
+  if (allDocs.length === 0) return;
+
+  const list = [...allDocs];
+  if (movedDocId && targetOrder !== null) {
+    const movedIndex = list.findIndex((d) => String(d._id) === String(movedDocId));
+    if (movedIndex !== -1) {
+      const [movedItem] = list.splice(movedIndex, 1);
+      const insertIndex = Math.max(0, Math.min(list.length, targetOrder - 1));
+      list.splice(insertIndex, 0, movedItem);
+    }
+  }
+
+  const bulkOps = list.map((item, index) => ({
+    updateOne: {
+      filter: { _id: item._id, tenantId },
+      update: { $set: { displayOrder: index + 1 } },
+    },
+  }));
+
+  if (bulkOps.length > 0) {
+    await MeasurementDefinition.bulkWrite(bulkOps);
+  }
+};
+
+/**
  * GET /api/measurement-definitions
  * Retrieve measurement definitions for the authenticated tenant.
  * Query params: category ('shirt_measurement' | 'pant_measurement'), active ('true' | 'false')
@@ -49,8 +84,36 @@ export const getMeasurementDefinitions = async (req, res, next) => {
     }
 
     const definitions = await MeasurementDefinition.find(query)
-      .sort({ category: 1, displayOrder: 1, createdAt: 1 })
+      .sort({ category: 1, displayOrder: 1, createdAt: 1, _id: 1 })
       .lean();
+
+    // Check if any items have duplicate or non-sequential display orders
+    let hasDuplicateOrder = false;
+    const seenOrders = new Set();
+    for (const def of definitions) {
+      const key = `${def.category}:${def.displayOrder}`;
+      if (seenOrders.has(key)) {
+        hasDuplicateOrder = true;
+        break;
+      }
+      seenOrders.add(key);
+    }
+
+    if (hasDuplicateOrder) {
+      if (category) {
+        await resequenceDefinitions(tenantId, category);
+      } else {
+        await resequenceDefinitions(tenantId, 'shirt_measurement');
+        await resequenceDefinitions(tenantId, 'pant_measurement');
+      }
+      const healedDefs = await MeasurementDefinition.find(query)
+        .sort({ category: 1, displayOrder: 1, createdAt: 1, _id: 1 })
+        .lean();
+      return res.json({
+        success: true,
+        data: healedDefs,
+      });
+    }
 
     return res.json({
       success: true,
@@ -138,10 +201,14 @@ export const createMeasurementDefinition = async (req, res, next) => {
         duplicate.displayOrder = orderNum;
         await duplicate.save();
 
+        // Resequence category so display order is strictly sequential
+        await resequenceDefinitions(tenantId, category, duplicate._id, orderNum);
+        const refreshedDuplicate = await MeasurementDefinition.findOne({ _id: duplicate._id, tenantId });
+
         return res.status(201).json({
           success: true,
-          message: `Measurement "${duplicate.displayName}" added successfully`,
-          data: duplicate,
+          message: `Measurement "${refreshedDuplicate.displayName}" added successfully`,
+          data: refreshedDuplicate,
         });
       }
 
@@ -176,10 +243,14 @@ export const createMeasurementDefinition = async (req, res, next) => {
 
     await newDef.save();
 
+    // Resequence category so display order is strictly sequential
+    await resequenceDefinitions(tenantId, category, newDef._id, orderNum);
+    const refreshedDef = await MeasurementDefinition.findOne({ _id: newDef._id, tenantId });
+
     return res.status(201).json({
       success: true,
-      message: `Measurement "${newDef.displayName}" added successfully`,
-      data: newDef,
+      message: `Measurement "${refreshedDef.displayName}" added successfully`,
+      data: refreshedDef,
     });
   } catch (error) {
     if (error.code === 11000) {
@@ -254,19 +325,26 @@ export const updateMeasurementDefinition = async (req, res, next) => {
       definition.isActive = Boolean(isActive);
     }
 
+    let targetOrder = null;
     if (displayOrder !== undefined) {
       const parsedOrder = parseInt(displayOrder, 10);
-      if (!isNaN(parsedOrder)) {
+      if (!isNaN(parsedOrder) && parsedOrder > 0) {
         definition.displayOrder = parsedOrder;
+        targetOrder = parsedOrder;
       }
     }
 
     await definition.save();
 
+    // Resequence category definitions so target position is applied and all items shift sequentially 1..N
+    await resequenceDefinitions(tenantId, definition.category, definition._id, targetOrder);
+
+    const refreshed = await MeasurementDefinition.findOne({ _id: id, tenantId });
+
     return res.json({
       success: true,
-      message: `Measurement "${definition.displayName}" updated successfully`,
-      data: definition,
+      message: `Measurement "${refreshed.displayName}" updated successfully`,
+      data: refreshed,
     });
   } catch (error) {
     next(error);
@@ -364,6 +442,9 @@ export const deleteMeasurementDefinition = async (req, res, next) => {
     definition.isDeleted = true;
     definition.isActive = false;
     await definition.save();
+
+    // Resequence remaining definitions so there are no gaps
+    await resequenceDefinitions(tenantId, definition.category);
 
     return res.json({
       success: true,

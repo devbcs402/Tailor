@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Ruler,
@@ -123,9 +123,12 @@ export const MeasurementSettingsPage = () => {
     fetchPatterns();
   }, []);
 
-  // Current list based on active tab
+  // Current list based on active tab, sorted strictly by displayOrder
   const currentCategory = activeTab === 'pant_measurement' ? 'pant_measurement' : 'shirt_measurement';
-  const currentDefinitions = activeTab === 'pant_measurement' ? pantDefinitions : shirtDefinitions;
+  const currentDefinitions = useMemo(() => {
+    const list = activeTab === 'pant_measurement' ? pantDefinitions : shirtDefinitions;
+    return [...list].sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+  }, [activeTab, pantDefinitions, shirtDefinitions]);
 
   // Filter definitions by search query
   const filteredDefinitions = currentDefinitions.filter((d) => {
@@ -259,7 +262,7 @@ export const MeasurementSettingsPage = () => {
         success(res.message || 'Measurement added successfully');
       }
       setIsModalOpen(false);
-      fetchDefinitions();
+      await fetchDefinitions();
       notifyMeasurementsUpdated();
     } catch (err) {
       setModalError(err.message || 'Failed to save measurement configuration');
@@ -1237,15 +1240,19 @@ export const MeasurementSettingsPage = () => {
 
               {/* Display Order */}
               <div className="form-group">
-                <label className="form-label">Display Order</label>
+                <label className="form-label">Display Order (Position)</label>
                 <input
                   type="number"
                   min="1"
+                  max={Math.max(currentDefinitions.length + (editingDef ? 0 : 1), 1)}
                   className="form-control"
                   style={{ width: '120px' }}
                   value={modalFormData.displayOrder}
                   onChange={(e) => setModalFormData({ ...modalFormData, displayOrder: e.target.value })}
                 />
+                <span style={{ fontSize: '0.74rem', color: '#64748b', display: 'block', marginTop: '4px' }}>
+                  Setting a position automatically shifts other measurements into 1..N order.
+                </span>
               </div>
 
               {/* Modal Actions */}
