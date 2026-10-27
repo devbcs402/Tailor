@@ -46,6 +46,10 @@ export const OwnerLayout = () => {
 
   const { title, subtitle } = getPageMeta();
 
+  React.useEffect(() => {
+    document.title = title ? `${title} | Platform Owner Console` : 'Platform Owner Console';
+  }, [location.pathname, title]);
+
   return (
     <div className="app-container">
       <OwnerSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />

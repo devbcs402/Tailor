@@ -110,7 +110,7 @@ export const validateMeasurementsWithDefinitions = (rawMeasurements = {}, defini
   return null;
 };
 
-export const buildMeasurementSnapshot = (rawMeasurements = {}, definitions = []) => {
+export const buildMeasurementSnapshot = (rawMeasurements = {}, definitions = [], existingSnapshot = null) => {
   const measurements = toPlainObj(rawMeasurements);
   const snapshot = [];
   const handledKeys = new Set();
@@ -131,21 +131,24 @@ export const buildMeasurementSnapshot = (rawMeasurements = {}, definitions = [])
     }
   }
 
-  // Include any custom or historical keys not in definitions
-  for (const [key, val] of Object.entries(measurements)) {
-    if (key.startsWith('$') || key.startsWith('_') || key === 'notes' || key === 'isNew' || handledKeys.has(key)) {
-      continue;
-    }
-    if (val !== undefined && val !== null && String(val).trim() !== '') {
-      const parsedVal = !isNaN(Number(val)) ? Number(val) : String(val).trim();
-      snapshot.push({
-        fieldKey: key,
-        displayName: key.charAt(0).toUpperCase() + key.slice(1),
-        gujaratiName: '',
-        fieldType: !isNaN(Number(val)) ? 'number' : 'text',
-        unit: '',
-        value: parsedVal,
-      });
+  // If editing an existing order with a prior snapshot, preserve historical fields from that original snapshot
+  if (Array.isArray(existingSnapshot) && existingSnapshot.length > 0) {
+    for (const snapItem of existingSnapshot) {
+      if (!handledKeys.has(snapItem.fieldKey)) {
+        const val = getMeasurementVal(measurements, snapItem.fieldKey) ?? snapItem.value;
+        if (val !== undefined && val !== null && String(val).trim() !== '') {
+          const parsedVal = (snapItem.fieldType === 'number' && !isNaN(Number(val))) ? Number(val) : String(val).trim();
+          snapshot.push({
+            fieldKey: snapItem.fieldKey,
+            displayName: snapItem.displayName,
+            gujaratiName: snapItem.gujaratiName || '',
+            fieldType: snapItem.fieldType || 'number',
+            unit: snapItem.unit || '',
+            value: parsedVal,
+          });
+          handledKeys.add(snapItem.fieldKey);
+        }
+      }
     }
   }
 
@@ -750,10 +753,10 @@ export const updateOrder = async (req, res, next) => {
       }
     }
 
-    // Refresh measurement snapshot
+    // Refresh measurement snapshot while preserving any prior snapshot fields from this specific order
     order.measurementSnapshot = {
-      shirt: (order.shirt?.quantity || 0) > 0 ? buildMeasurementSnapshot(order.shirt.measurements, shirtDefs) : [],
-      pant: (order.pant?.quantity || 0) > 0 ? buildMeasurementSnapshot(order.pant.measurements, pantDefs) : [],
+      shirt: (order.shirt?.quantity || 0) > 0 ? buildMeasurementSnapshot(order.shirt.measurements, shirtDefs, order.measurementSnapshot?.shirt) : [],
+      pant: (order.pant?.quantity || 0) > 0 ? buildMeasurementSnapshot(order.pant.measurements, pantDefs, order.measurementSnapshot?.pant) : [],
     };
 
     if (specialInstructions !== undefined) {

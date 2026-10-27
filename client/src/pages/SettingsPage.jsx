@@ -270,7 +270,7 @@ export const SettingsPage = () => {
                 Studio / Shop Name
               </div>
               <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--primary)', marginTop: '2px' }}>
-                {user?.shopName || 'Silai Master Tailor Studio'}
+                {user?.tenant?.businessName || user?.shopName || 'Tailor Studio'}
               </div>
             </div>
 

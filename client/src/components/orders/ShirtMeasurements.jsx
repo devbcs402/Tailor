@@ -16,6 +16,7 @@ export const ShirtMeasurements = ({
   errors = {},
   onClearError,
   definitions: propDefinitions,
+  allowHistoricalFields = false,
 }) => {
   // Use pattern hook for real-time synchronized pattern definitions
   const { patternNames: availablePatterns, loading: loadingPatterns } = useTenantPatterns('shirt');
@@ -82,28 +83,30 @@ export const ShirtMeasurements = ({
     onChangeMeasurements(updated);
   };
 
-  // Identify any saved measurements that are NOT in current active definitions (historical/deactivated fields)
-  // Ensures historical orders never lose or hide previously entered custom measurements
-  const historicalFields = Object.keys(measurements)
-    .filter(
-      (k) =>
-        k !== 'notes' &&
-        k !== '_id' &&
-        !k.startsWith('$') &&
-        !k.startsWith('_') &&
-        !isCoveredByDefinitions(k, baseDefinitions) &&
-        measurements[k] !== undefined &&
-        measurements[k] !== null &&
-        String(measurements[k]).trim().length > 0
-    )
-    .map((k) => ({
-      fieldKey: k,
-      displayName: k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-      gujaratiName: '',
-      fieldType: 'number',
-      isRequired: false,
-      isHistorical: true,
-    }));
+  // Only include historical fields if explicitly allowed (e.g. editing an existing order with historical snapshot)
+  // New orders will strictly display only the currently active measurement definitions
+  const historicalFields = allowHistoricalFields
+    ? Object.keys(measurements)
+        .filter(
+          (k) =>
+            k !== 'notes' &&
+            k !== '_id' &&
+            !k.startsWith('$') &&
+            !k.startsWith('_') &&
+            !isCoveredByDefinitions(k, baseDefinitions) &&
+            measurements[k] !== undefined &&
+            measurements[k] !== null &&
+            String(measurements[k]).trim().length > 0
+        )
+        .map((k) => ({
+          fieldKey: k,
+          displayName: k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+          gujaratiName: '',
+          fieldType: 'number',
+          isRequired: false,
+          isHistorical: true,
+        }))
+    : [];
 
   const allFieldsToRender = [...baseDefinitions, ...historicalFields];
 

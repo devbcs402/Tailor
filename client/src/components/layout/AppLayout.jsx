@@ -1,14 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { useAuth } from '../../context/AuthContext';
 
 export const AppLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const { user } = useAuth();
+
+  const businessName = user?.tenant?.businessName || user?.shopName || 'Silai Master';
 
   // Automatically close mobile sidebar drawer upon navigation
-  React.useEffect(() => {
+  useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
 
@@ -20,6 +24,9 @@ export const AppLayout = () => {
     }
     if (path === '/orders/create') {
       return { title: 'Create Order', subtitle: 'Customer details, measurements, and patterns' };
+    }
+    if (path.startsWith('/orders/') && path.endsWith('/edit')) {
+      return { title: 'Edit Order', subtitle: 'Update customer details, measurements, and garment patterns' };
     }
     if (path.startsWith('/orders/') && path !== '/orders') {
       return { title: 'Order Details', subtitle: 'Measurements, garment patterns, and order schedule' };
@@ -42,10 +49,19 @@ export const AppLayout = () => {
     if (path === '/settings') {
       return { title: 'Settings', subtitle: 'Application preferences and studio settings' };
     }
-    return { title: 'Silai Master', subtitle: 'Tailor Management System' };
+    return { title: businessName, subtitle: 'Tailor Management System' };
   };
 
   const { title, subtitle } = getPageMeta();
+
+  // Dynamic website title showing tenant's Business Name
+  useEffect(() => {
+    if (title && title !== businessName) {
+      document.title = `${title} | ${businessName}`;
+    } else {
+      document.title = `${businessName} - Tailor Management System`;
+    }
+  }, [location.pathname, businessName, title]);
 
   return (
     <div className="app-container">

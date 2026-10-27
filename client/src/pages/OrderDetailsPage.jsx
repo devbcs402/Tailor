@@ -62,6 +62,13 @@ export const OrderDetailsPage = () => {
     fetchOrder();
   }, [id]);
 
+  useEffect(() => {
+    if (order?.orderNumber) {
+      const businessName = user?.tenant?.businessName || user?.shopName || 'Tailor Studio';
+      document.title = `Order #${order.orderNumber} | ${businessName}`;
+    }
+  }, [order, user]);
+
   if (loading) return <Loading text="Loading order details..." />;
   if (error) return <ErrorMessage message={error} onRetry={fetchOrder} />;
   if (!order) return <ErrorMessage message="Order not found" />;
@@ -93,34 +100,45 @@ export const OrderDetailsPage = () => {
     }
   };
 
-  // Dynamic fields resolution supporting custom fields and historical snapshots
+  // Dynamic fields resolution: display order's saved historical snapshot or saved measurements
   const resolveGarmentFields = (snapshotList, rawMeasurements, definitions) => {
+    // 1. If order has a saved snapshot, render that snapshot exactly
     if (Array.isArray(snapshotList) && snapshotList.length > 0) {
       return snapshotList.map((item) => ({
         key: item.fieldKey,
-        label: item.displayName,
-        gujaratiLabel: item.gujaratiName,
+        label: item.displayName || item.fieldKey,
+        gujaratiLabel: item.gujaratiName || '',
         value: item.value,
       }));
     }
 
+    // 2. For legacy orders without a snapshot, render ONLY the measurements saved in this order
     const measurements = rawMeasurements || {};
     const baseDefs = Array.isArray(definitions) ? definitions : [];
-    const defKeys = new Set(baseDefs.map((d) => d.fieldKey));
+    const defsMap = new Map();
+    baseDefs.forEach((d) => {
+      if (d && d.fieldKey) {
+        defsMap.set(d.fieldKey, d);
+        defsMap.set(normalizeKey(d.fieldKey), d);
+      }
+    });
 
-    const fields = baseDefs.map((d) => ({
-      key: d.fieldKey,
-      label: d.displayName,
-      gujaratiLabel: d.gujaratiName,
-      value: getFieldValue(measurements, d.fieldKey) || '-',
-    }));
-
+    const fields = [];
     Object.keys(measurements).forEach((k) => {
-      if (k !== 'notes' && k !== '_id' && !defKeys.has(k) && measurements[k] !== undefined && measurements[k] !== null && String(measurements[k]).trim().length > 0) {
+      if (
+        k !== 'notes' &&
+        k !== '_id' &&
+        !k.startsWith('$') &&
+        !k.startsWith('_') &&
+        measurements[k] !== undefined &&
+        measurements[k] !== null &&
+        String(measurements[k]).trim().length > 0
+      ) {
+        const def = defsMap.get(k) || defsMap.get(normalizeKey(k));
         fields.push({
           key: k,
-          label: k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-          gujaratiLabel: '',
+          label: def?.displayName || k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+          gujaratiLabel: def?.gujaratiName || '',
           value: measurements[k],
         });
       }

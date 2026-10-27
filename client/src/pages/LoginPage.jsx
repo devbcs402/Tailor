@@ -15,6 +15,10 @@ export const LoginPage = () => {
   const { success } = useToast();
   const navigate = useNavigate();
 
+  React.useEffect(() => {
+    document.title = 'Login | Tailor Management System';
+  }, []);
+
   if (isAuthenticated) {
     if (user?.mustChangePassword) {
       return <Navigate to="/change-password" replace />;

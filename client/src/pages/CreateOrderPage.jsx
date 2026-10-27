@@ -212,11 +212,28 @@ export const CreateOrderPage = ({ isEdit: isEditProp }) => {
   // -------------------------------------------------------------
   // Measurement Loading Helpers
   // -------------------------------------------------------------
+  // Helper to map saved customer measurements strictly to active definitions
+  // Ensures historical fields (e.g. deactivated Length) never leak into new orders
+  const mapSavedMeasurementsToDefinitions = (savedObj, definitions) => {
+    if (!savedObj || !Array.isArray(definitions) || definitions.length === 0) return {};
+    const mapped = {};
+    for (const def of definitions) {
+      const val = getFieldValue(savedObj, def.fieldKey);
+      if (val !== undefined && val !== null && String(val).trim().length > 0) {
+        mapped[def.fieldKey] = String(val).trim();
+      }
+    }
+    return mapped;
+  };
+
   const loadCustomerSavedMeasurements = (customer) => {
     const lm = customer?.latestMeasurements || {};
 
     if (lm.shirt) {
-      setShirtMeasurements({ ...lm.shirt });
+      const mappedShirt = isEditing
+        ? { ...lm.shirt }
+        : mapSavedMeasurementsToDefinitions(lm.shirt, shirtDefinitions);
+      setShirtMeasurements(mappedShirt);
       const sPatterns = Array.isArray(lm.shirtPatterns) && lm.shirtPatterns.length > 0
         ? lm.shirtPatterns
         : (lm.shirtPattern ? [lm.shirtPattern] : []);
@@ -225,7 +242,10 @@ export const CreateOrderPage = ({ isEdit: isEditProp }) => {
     }
 
     if (lm.pant) {
-      setPantMeasurements({ ...lm.pant });
+      const mappedPant = isEditing
+        ? { ...lm.pant }
+        : mapSavedMeasurementsToDefinitions(lm.pant, pantDefinitions);
+      setPantMeasurements(mappedPant);
       const pPatterns = Array.isArray(lm.pantPatterns) && lm.pantPatterns.length > 0
         ? lm.pantPatterns
         : (lm.pantPattern ? [lm.pantPattern] : []);
@@ -242,18 +262,12 @@ export const CreateOrderPage = ({ isEdit: isEditProp }) => {
     setPantErrors({});
     setValidationError('');
 
-    const hasSaved = checkHasCustomerMeasurements(customer);
-    if (hasSaved) {
-      setMeasurementChoice('use_existing');
-      loadCustomerSavedMeasurements(customer);
-    } else {
+    // For new orders, keep inputs clean and default to fresh input unless user explicitly reuses measurements
+    if (!isEditing) {
       setMeasurementChoice('add_new');
       setMeasurementSource('custom');
-      // If customer has no saved measurements, keep blank inputs
-      if (!isEditing) {
-        setShirtMeasurements({});
-        setPantMeasurements({});
-      }
+      setShirtMeasurements({});
+      setPantMeasurements({});
     }
   };
 
@@ -314,22 +328,6 @@ export const CreateOrderPage = ({ isEdit: isEditProp }) => {
     if (isNaN(parsed) || parsed <= 0) {
       setShirtMeasurements({});
       setShirtErrors({});
-    } else {
-      const currentHasValues = Object.values(shirtMeasurements).some((v) => v && String(v).trim().length > 0);
-      if (!currentHasValues && selectedCustomer?.latestMeasurements?.shirt) {
-        const saved = selectedCustomer.latestMeasurements.shirt;
-        const savedHasValues = Object.values(saved).some((v) => v && String(v).trim().length > 0);
-        if (savedHasValues) {
-          setShirtMeasurements({ ...saved });
-          const sPatterns = Array.isArray(selectedCustomer.latestMeasurements.shirtPatterns) && selectedCustomer.latestMeasurements.shirtPatterns.length > 0
-            ? selectedCustomer.latestMeasurements.shirtPatterns
-            : (selectedCustomer.latestMeasurements.shirtPattern ? [selectedCustomer.latestMeasurements.shirtPattern] : []);
-          if (sPatterns.length > 0) setShirtPatterns(sPatterns);
-          if (selectedCustomer.latestMeasurements.shirtCustomPattern) {
-            setShirtCustomPattern(selectedCustomer.latestMeasurements.shirtCustomPattern);
-          }
-        }
-      }
     }
   };
 
@@ -339,22 +337,6 @@ export const CreateOrderPage = ({ isEdit: isEditProp }) => {
     if (isNaN(parsed) || parsed <= 0) {
       setPantMeasurements({});
       setPantErrors({});
-    } else {
-      const currentHasValues = Object.values(pantMeasurements).some((v) => v && String(v).trim().length > 0);
-      if (!currentHasValues && selectedCustomer?.latestMeasurements?.pant) {
-        const saved = selectedCustomer.latestMeasurements.pant;
-        const savedHasValues = Object.values(saved).some((v) => v && String(v).trim().length > 0);
-        if (savedHasValues) {
-          setPantMeasurements({ ...saved });
-          const pPatterns = Array.isArray(selectedCustomer.latestMeasurements.pantPatterns) && selectedCustomer.latestMeasurements.pantPatterns.length > 0
-            ? selectedCustomer.latestMeasurements.pantPatterns
-            : (selectedCustomer.latestMeasurements.pantPattern ? [selectedCustomer.latestMeasurements.pantPattern] : []);
-          if (pPatterns.length > 0) setPantPatterns(pPatterns);
-          if (selectedCustomer.latestMeasurements.pantCustomPattern) {
-            setPantCustomPattern(selectedCustomer.latestMeasurements.pantCustomPattern);
-          }
-        }
-      }
     }
   };
 
@@ -597,6 +579,30 @@ export const CreateOrderPage = ({ isEdit: isEditProp }) => {
   }
 
   const customerHasSaved = checkHasCustomerMeasurements(selectedCustomer);
+
+  // For existing orders, load definition labels and keys from that order's saved snapshot
+  // For new orders, use the currently active definitions from Measurement Settings
+  const shirtEditDefs = (isEditing && Array.isArray(originalOrder?.measurementSnapshot?.shirt) && originalOrder.measurementSnapshot.shirt.length > 0)
+    ? originalOrder.measurementSnapshot.shirt.map((item) => ({
+        fieldKey: item.fieldKey,
+        displayName: item.displayName || item.fieldKey,
+        gujaratiName: item.gujaratiName || '',
+        fieldType: item.fieldType || 'number',
+        unit: item.unit || '',
+        isRequired: false,
+      }))
+    : shirtDefinitions;
+
+  const pantEditDefs = (isEditing && Array.isArray(originalOrder?.measurementSnapshot?.pant) && originalOrder.measurementSnapshot.pant.length > 0)
+    ? originalOrder.measurementSnapshot.pant.map((item) => ({
+        fieldKey: item.fieldKey,
+        displayName: item.displayName || item.fieldKey,
+        gujaratiName: item.gujaratiName || '',
+        fieldType: item.fieldType || 'number',
+        unit: item.unit || '',
+        isRequired: false,
+      }))
+    : pantDefinitions;
 
   return (
     <div style={{ maxWidth: '1080px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -1017,7 +1023,8 @@ export const CreateOrderPage = ({ isEdit: isEditProp }) => {
           onChangeQuantity={handleShirtQuantityChange}
           errors={shirtErrors}
           onClearError={handleClearShirtError}
-          definitions={shirtDefinitions}
+          definitions={isEditing ? shirtEditDefs : shirtDefinitions}
+          allowHistoricalFields={isEditing}
         />
 
         {/* SECTION 3: Pant Specifications & Measurements */}
@@ -1032,7 +1039,8 @@ export const CreateOrderPage = ({ isEdit: isEditProp }) => {
           onChangeQuantity={handlePantQuantityChange}
           errors={pantErrors}
           onClearError={handleClearPantError}
-          definitions={pantDefinitions}
+          definitions={isEditing ? pantEditDefs : pantDefinitions}
+          allowHistoricalFields={isEditing}
         />
 
         {/* SECTION 4: Order Schedule & Instructions */}

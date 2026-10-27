@@ -1,5 +1,7 @@
+import mongoose from 'mongoose';
 import { Customer } from '../models/Customer.js';
 import { Order } from '../models/Order.js';
+import { AuditLog } from '../models/AuditLog.js';
 
 // Normalize mobile number (remove spaces, dashes)
 const normalizeMobile = (mobile) => {
@@ -9,13 +11,17 @@ const normalizeMobile = (mobile) => {
 export const getCustomers = async (req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
-    const { search = '', sortBy = 'newest', page = 1, limit = 20 } = req.query;
+    const { search = '', sortBy = 'newest', page = 1, limit = 20, status = '' } = req.query;
     const pageNum = Math.max(1, parseInt(page, 10));
     const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10)));
     const skip = (pageNum - 1) * limitNum;
 
-    // Strictly enforce tenant isolation
-    const query = { tenantId, isActive: true };
+    // Strictly enforce tenant isolation, excluding archived/soft-deleted customers by default
+    const query = { tenantId, isActive: true, isArchived: { $ne: true } };
+    if (status === 'archived' || req.query.archived === 'true') {
+      delete query.isActive;
+      query.isArchived = true;
+    }
     if (search.trim()) {
       const regex = new RegExp(search.trim(), 'i');
       query.$or = [{ name: regex }, { mobileNumber: regex }, { address: regex }];
@@ -288,6 +294,192 @@ export const getCustomerOrders = async (req, res, next) => {
     return res.json({
       success: true,
       data: orders,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * DELETE /api/customers/:id
+ * Delete a customer permanently if no orders exist, or archive safely if linked to orders
+ */
+export const deleteCustomer = async (req, res, next) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { id } = req.params;
+    const shouldArchive = req.query.archive === 'true' || req.body?.archive === true;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid customer ID provided.',
+      });
+    }
+
+    const customer = await Customer.findOne({ _id: id, tenantId });
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Customer not found.',
+      });
+    }
+
+    // Check if customer is linked to existing orders within this tenant
+    const orderCount = await Order.countDocuments({ customer: id, tenantId });
+
+    // If customer has orders, prevent permanent deletion and advise archival
+    if (orderCount > 0 && !shouldArchive) {
+      return res.status(400).json({
+        success: false,
+        code: 'CUSTOMER_HAS_ORDERS',
+        message: `Cannot permanently delete customer "${customer.name}". This customer is linked to ${orderCount} existing order(s). You can archive this customer instead to preserve historical records.`,
+        orderCount,
+        canArchive: true,
+      });
+    }
+
+    if (orderCount > 0 && shouldArchive) {
+      // Safe Archival: Soft delete customer to preserve historical orders
+      customer.isActive = false;
+      customer.isArchived = true;
+      customer.archivedAt = new Date();
+      await customer.save();
+
+      try {
+        await AuditLog.create({
+          actor: req.user._id,
+          actorEmail: req.user.email,
+          actorRole: req.user.role,
+          action: 'customer_archived',
+          targetTenant: tenantId,
+          targetTenantName: req.tenant?.businessName || '',
+          details: {
+            customerId: customer._id,
+            customerName: customer.name,
+            mobileNumber: customer.mobileNumber,
+            orderCount,
+          },
+          ipAddress: req.ip || '',
+          userAgent: req.headers['user-agent'] || '',
+        });
+      } catch (auditErr) {
+        console.warn('[Audit Warning] Could not record customer_archived audit:', auditErr.message);
+      }
+
+      return res.json({
+        success: true,
+        action: 'archived',
+        message: `Customer "${customer.name}" has ${orderCount} historical order(s) and has been safely archived.`,
+        data: {
+          id: customer._id,
+          name: customer.name,
+          isArchived: true,
+          orderCount,
+        },
+      });
+    }
+
+    // orderCount === 0: Allow permanent deletion
+    await Customer.deleteOne({ _id: id, tenantId });
+
+    try {
+      await AuditLog.create({
+        actor: req.user._id,
+        actorEmail: req.user.email,
+        actorRole: req.user.role,
+        action: 'customer_deleted',
+        targetTenant: tenantId,
+        targetTenantName: req.tenant?.businessName || '',
+        details: {
+          customerId: customer._id,
+          customerName: customer.name,
+          mobileNumber: customer.mobileNumber,
+          orderCount: 0,
+        },
+        ipAddress: req.ip || '',
+        userAgent: req.headers['user-agent'] || '',
+      });
+    } catch (auditErr) {
+      console.warn('[Audit Warning] Could not record customer_deleted audit:', auditErr.message);
+    }
+
+    return res.json({
+      success: true,
+      action: 'deleted',
+      message: `Customer "${customer.name}" deleted successfully.`,
+      data: {
+        id: customer._id,
+        name: customer.name,
+        deleted: true,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/customers/:id/archive
+ * Explicitly archive a customer
+ */
+export const archiveCustomer = async (req, res, next) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid customer ID provided.',
+      });
+    }
+
+    const customer = await Customer.findOne({ _id: id, tenantId });
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Customer not found.',
+      });
+    }
+
+    const orderCount = await Order.countDocuments({ customer: id, tenantId });
+    customer.isActive = false;
+    customer.isArchived = true;
+    customer.archivedAt = new Date();
+    await customer.save();
+
+    try {
+      await AuditLog.create({
+        actor: req.user._id,
+        actorEmail: req.user.email,
+        actorRole: req.user.role,
+        action: 'customer_archived',
+        targetTenant: tenantId,
+        targetTenantName: req.tenant?.businessName || '',
+        details: {
+          customerId: customer._id,
+          customerName: customer.name,
+          mobileNumber: customer.mobileNumber,
+          orderCount,
+        },
+        ipAddress: req.ip || '',
+        userAgent: req.headers['user-agent'] || '',
+      });
+    } catch (auditErr) {
+      console.warn('[Audit Warning] Could not record customer_archived audit:', auditErr.message);
+    }
+
+    return res.json({
+      success: true,
+      action: 'archived',
+      message: `Customer "${customer.name}" archived successfully.`,
+      data: {
+        id: customer._id,
+        name: customer.name,
+        isArchived: true,
+        orderCount,
+      },
     });
   } catch (error) {
     next(error);

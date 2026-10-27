@@ -32,6 +32,8 @@ const auditLogSchema = new mongoose.Schema(
         'password_changed',
         'platform_owner_login',
         'tenant_login',
+        'customer_deleted',
+        'customer_archived',
       ],
       index: true,
     },

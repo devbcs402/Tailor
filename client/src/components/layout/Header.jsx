@@ -7,6 +7,8 @@ export const Header = ({ onMenuClick, title, subtitle }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const businessName = user?.tenant?.businessName || user?.shopName || 'Tailor Studio';
+
   return (
     <header
       style={{
@@ -57,7 +59,7 @@ export const Header = ({ onMenuClick, title, subtitle }) => {
               textOverflow: 'ellipsis',
             }}
           >
-            {title || 'Silai Master'}
+            {title || businessName}
           </h1>
           {subtitle && (
             <p
@@ -104,7 +106,7 @@ export const Header = ({ onMenuClick, title, subtitle }) => {
           }}
         >
           <ShieldCheck size={16} color="var(--accent-gold)" />
-          <span style={{ fontWeight: 600 }}>{user?.shopName || 'Silai Master'}</span>
+          <span style={{ fontWeight: 600 }}>{businessName}</span>
         </div>
       </div>
 

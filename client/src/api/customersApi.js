@@ -11,4 +11,9 @@ export const customersApi = {
   updateMeasurements: (id, measurements) =>
     api.patch(`/customers/${id}/measurements`, { measurements }),
   getCustomerOrders: (id) => api.get(`/customers/${id}/orders`),
+  deleteCustomer: (id, options = {}) => {
+    const query = options.archive ? '?archive=true' : '';
+    return api.delete(`/customers/${id}${query}`);
+  },
+  archiveCustomer: (id) => api.post(`/customers/${id}/archive`, {}),
 };

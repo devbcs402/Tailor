@@ -4,6 +4,7 @@ import {
   Plus,
   Eye,
   Edit,
+  Trash2,
   Users,
   ArrowUpDown,
   ArrowUp,
@@ -16,6 +17,8 @@ import { ErrorMessage } from '../components/common/ErrorMessage';
 import { DataTablePagination } from '../components/common/DataTablePagination';
 import { SearchInput } from '../components/common/SearchInput';
 import { CustomerModal } from '../components/customers/CustomerModal';
+import { ConfirmDialog } from '../components/common/ConfirmDialog';
+import { useToast } from '../context/ToastContext';
 import { formatDate } from '../utils/dateUtils';
 
 export const CustomersPage = () => {
@@ -33,6 +36,13 @@ export const CustomersPage = () => {
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
   const [customerToEdit, setCustomerToEdit] = useState(null);
+
+  // Delete / Archive Modal State
+  const { success: toastSuccess, error: toastError } = useToast();
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [deleteNeedsArchive, setDeleteNeedsArchive] = useState(false);
 
   const navigate = useNavigate();
 
@@ -128,6 +138,75 @@ export const CustomersPage = () => {
   const handleOpenEdit = (customer) => {
     setCustomerToEdit(customer);
     setModalOpen(true);
+  };
+
+  const handleOpenDelete = (customer) => {
+    setDeleteTarget(customer);
+    setDeleteError('');
+    setDeleteNeedsArchive(Boolean(customer.totalOrders && customer.totalOrders > 0));
+  };
+
+  const handleCloseDelete = () => {
+    if (deleting) return;
+    setDeleteTarget(null);
+    setDeleteError('');
+    setDeleteNeedsArchive(false);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    setDeleteError('');
+
+    try {
+      const hasOrders = Boolean(deleteTarget.totalOrders && deleteTarget.totalOrders > 0);
+      const shouldArchive = deleteNeedsArchive || hasOrders;
+
+      const res = await customersApi.deleteCustomer(deleteTarget._id, {
+        archive: shouldArchive,
+      });
+
+      const isArchived = res?.action === 'archived' || shouldArchive;
+      const successMsg = isArchived
+        ? `Customer "${deleteTarget.name}" archived successfully to preserve historical orders.`
+        : `Customer "${deleteTarget.name}" deleted successfully.`;
+
+      toastSuccess(successMsg);
+
+      // Update customer list state immediately without full page reload
+      setCustomers((prev) => prev.filter((c) => c._id !== deleteTarget._id));
+      setPagination((prev) => ({
+        ...prev,
+        total: Math.max(0, prev.total - 1),
+        totalRecords: Math.max(0, prev.totalRecords - 1),
+      }));
+
+      handleCloseDelete();
+
+      // If current page is now empty and not page 1, re-fetch previous page
+      if (customers.length <= 1 && pagination.page > 1) {
+        fetchCustomers(pagination.page - 1, pageSize);
+      }
+    } catch (err) {
+      const isOrdersError =
+        err.response?.data?.code === 'CUSTOMER_HAS_ORDERS' ||
+        err.code === 'CUSTOMER_HAS_ORDERS' ||
+        (err.message && err.message.toLowerCase().includes('existing order'));
+
+      if (isOrdersError) {
+        setDeleteNeedsArchive(true);
+        setDeleteError(
+          err.response?.data?.message ||
+          `Customer "${deleteTarget.name}" has existing orders and cannot be permanently deleted. You can archive this customer instead to preserve historical records.`
+        );
+      } else {
+        const errorMsg = err.response?.data?.message || err.message || 'Failed to delete customer';
+        setDeleteError(errorMsg);
+        toastError(errorMsg);
+      }
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const hasActiveFilters = search.trim() !== '' || sortBy !== 'newest';
@@ -341,6 +420,21 @@ export const CustomersPage = () => {
                           >
                             <Edit size={16} />
                           </button>
+                          <button
+                            onClick={() => handleOpenDelete(c)}
+                            className="btn btn-outline btn-sm"
+                            style={{
+                              minWidth: '36px',
+                              minHeight: '36px',
+                              padding: '6px',
+                              color: '#dc2626',
+                              borderColor: '#fca5a5',
+                            }}
+                            title="Delete Customer"
+                            aria-label={`Delete customer ${c.name}`}
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -377,6 +471,73 @@ export const CustomersPage = () => {
           onSuccess={() => fetchCustomers(pagination.page, pageSize)}
         />
       )}
+
+      {/* Delete / Archive Customer Confirmation Modal */}
+      <ConfirmDialog
+        isOpen={Boolean(deleteTarget)}
+        onClose={handleCloseDelete}
+        onConfirm={handleConfirmDelete}
+        title={deleteNeedsArchive ? 'Archive Customer' : 'Delete Customer'}
+        message={`Are you sure you want to delete customer '${deleteTarget?.name}'? This action may affect orders associated with this customer.`}
+        confirmText={deleteNeedsArchive ? 'Archive Customer' : 'Delete Customer'}
+        cancelText="Cancel"
+        danger={!deleteNeedsArchive}
+        confirmVariant={deleteNeedsArchive ? 'warning' : 'danger'}
+        loading={deleting}
+        error={deleteError}
+      >
+        {deleteTarget && (
+          <div
+            style={{
+              backgroundColor: '#f8f7f2',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              padding: '12px 14px',
+              fontSize: '0.88rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#142d4e' }}>
+              <span style={{ color: '#64748b', fontWeight: 500 }}>Customer Name:</span>
+              <strong style={{ fontWeight: 700 }}>{deleteTarget.name}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#142d4e' }}>
+              <span style={{ color: '#64748b', fontWeight: 500 }}>Mobile Number:</span>
+              <strong style={{ fontWeight: 600 }}>{deleteTarget.mobileNumber}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#142d4e' }}>
+              <span style={{ color: '#64748b', fontWeight: 500 }}>Total Orders:</span>
+              <span
+                style={{
+                  fontWeight: 700,
+                  color: (deleteTarget.totalOrders || 0) > 0 ? '#b45309' : '#15803d',
+                }}
+              >
+                {deleteTarget.totalOrders || 0} order(s)
+              </span>
+            </div>
+
+            {deleteNeedsArchive && (
+              <div
+                style={{
+                  marginTop: '6px',
+                  padding: '8px 10px',
+                  borderRadius: '6px',
+                  backgroundColor: '#fef3c7',
+                  border: '1px solid #fde68a',
+                  color: '#92400e',
+                  fontSize: '0.82rem',
+                  lineHeight: 1.4,
+                }}
+              >
+                This customer has historical order(s). To preserve order records, invoices, and measurement snapshots, this customer will be safely archived rather than permanently deleted.
+              </div>
+            )}
+          </div>
+        )}
+      </ConfirmDialog>
 
       <style>{`
         @media (max-width: 640px) {

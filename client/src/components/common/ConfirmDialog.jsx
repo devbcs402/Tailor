@@ -14,6 +14,7 @@ export const ConfirmDialog = ({
   confirmVariant,
   loading = false,
   error = '',
+  children,
 }) => {
   const handleClose = () => {
     if (loading) return;
@@ -100,9 +101,14 @@ export const ConfirmDialog = ({
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>
               {title}
             </h3>
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.4 }}>
-              {message}
-            </p>
+            {message && (
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.4 }}>
+                {message}
+              </p>
+            )}
+            {children && (
+              <div style={{ marginTop: '10px' }}>{children}</div>
+            )}
             {error && (
               <div
                 style={{

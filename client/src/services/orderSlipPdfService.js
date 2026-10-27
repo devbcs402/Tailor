@@ -23,6 +23,225 @@ const COLORS = {
 };
 
 /**
+ * Detect non-ASCII characters (e.g. Gujarati script \u0A80-\u0AFF, Indic scripts, etc.)
+ */
+export const containsNonAscii = (str) => {
+  if (!str) return false;
+  return /[^\x00-\x7F]/.test(String(str));
+};
+
+const textImageCache = new Map();
+
+/**
+ * Render text (especially containing Unicode/Gujarati scripts) to a high-resolution PNG data URL.
+ * In browser environments, Canvas 2D uses native HarfBuzz/DirectWrite/CoreText complex text shaping
+ * to render Gujarati ligatures and matras with 100% typographic accuracy.
+ */
+const renderTextToImage = (text, options = {}) => {
+  if (typeof document === 'undefined') return null;
+
+  const {
+    widthMm = 28,
+    heightMm = 6,
+    color = '#64748B',
+    fontSizePt = 7,
+    fontWeight = 'bold',
+    fontFamily = '"Noto Sans Gujarati", "Shruti", "Nirmala UI", "Gujarati Sangam MN", sans-serif',
+    align = 'center',
+    line1 = '',
+    line2 = '',
+    scale = 4, // 4x for 300+ DPI razor-sharp print quality
+  } = options;
+
+  const cacheKey = `${text || (line1 + '||' + line2)}_${widthMm}_${heightMm}_${color}_${fontSizePt}_${fontWeight}_${align}`;
+  if (textImageCache.has(cacheKey)) {
+    return textImageCache.get(cacheKey);
+  }
+
+  // 1mm ~ 3.7795 px at 96 DPI
+  const pxPerMm = 3.7795 * scale;
+  const canvasW = Math.max(10, Math.round(widthMm * pxPerMm));
+  const canvasH = Math.max(10, Math.round(heightMm * pxPerMm));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = canvasW;
+  canvas.height = canvasH;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  ctx.fillStyle = color;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'middle';
+
+  const posX = align === 'center' ? canvasW / 2 : align === 'right' ? canvasW - 4 * scale : 4 * scale;
+
+  if (line1 !== undefined && line2 !== undefined && (line1 || line2)) {
+    // 2-line mode: English on line 1, Gujarati transliteration / name in parentheses on line 2
+    let l1Size = Math.max(7 * scale, Math.round(fontSizePt * scale * 1.05));
+    let l2Size = Math.max(6 * scale, Math.round(fontSizePt * scale * 0.95));
+
+    // Measure line 1 and scale down if needed
+    ctx.font = `${fontWeight} ${l1Size}px ${fontFamily}`;
+    let l1W = ctx.measureText(line1).width;
+    const maxW = canvasW - 4 * scale;
+    while (l1W > maxW && l1Size > 6 * scale) {
+      l1Size -= 1 * scale;
+      ctx.font = `${fontWeight} ${l1Size}px ${fontFamily}`;
+      l1W = ctx.measureText(line1).width;
+    }
+
+    // Measure line 2 and scale down if needed
+    ctx.font = `normal ${l2Size}px ${fontFamily}`;
+    let l2W = ctx.measureText(line2).width;
+    while (l2W > maxW && l2Size > 5 * scale) {
+      l2Size -= 1 * scale;
+      ctx.font = `normal ${l2Size}px ${fontFamily}`;
+      l2W = ctx.measureText(line2).width;
+    }
+
+    // Draw line 1 (upper half)
+    ctx.font = `${fontWeight} ${l1Size}px ${fontFamily}`;
+    ctx.fillText(line1, posX, canvasH * 0.32);
+
+    // Draw line 2 (lower half)
+    ctx.font = `normal ${l2Size}px ${fontFamily}`;
+    ctx.fillText(line2, posX, canvasH * 0.74);
+  } else {
+    // Single line mode with auto-fit downscaling
+    let currentSize = Math.round(fontSizePt * scale * 1.3);
+    ctx.font = `${fontWeight} ${currentSize}px ${fontFamily}`;
+    let measuredW = ctx.measureText(text).width;
+    const maxW = canvasW - 4 * scale;
+
+    while (measuredW > maxW && currentSize > 6 * scale) {
+      currentSize -= 1 * scale;
+      ctx.font = `${fontWeight} ${currentSize}px ${fontFamily}`;
+      measuredW = ctx.measureText(text).width;
+    }
+
+    ctx.fillText(text, posX, canvasH / 2);
+  }
+
+  const dataUrl = canvas.toDataURL('image/png');
+  textImageCache.set(cacheKey, dataUrl);
+  return dataUrl;
+};
+
+/**
+ * Draw measurement box label safely.
+ * If Gujarati script is present, renders a high-res image via HTML5 Canvas so that
+ * jsPDF standard fonts do not corrupt the Unicode characters into WinAnsi mojibake.
+ */
+const drawMeasurementBoxLabel = (doc, field, bx, by, boxW, boxH) => {
+  const englishLabel = String(field.label || field.key || '').trim();
+  const gujaratiLabel = String(field.gujaratiLabel || '').trim();
+
+  // If Gujarati text exists, render via Canvas 2D image
+  const hasGujarati = Boolean(gujaratiLabel && containsNonAscii(gujaratiLabel));
+
+  if (hasGujarati && typeof document !== 'undefined') {
+    const labelHeightMm = 5.8;
+    const labelWidthMm = boxW - 2;
+
+    const line1 = englishLabel;
+    const line2 = `(${gujaratiLabel})`;
+
+    const dataUrl = renderTextToImage(null, {
+      widthMm: labelWidthMm,
+      heightMm: labelHeightMm,
+      color: '#64748B',
+      fontSizePt: 6.8,
+      fontWeight: 'bold',
+      align: 'center',
+      line1,
+      line2,
+    });
+
+    if (dataUrl) {
+      doc.addImage(dataUrl, 'PNG', bx + 1, by + 0.8, labelWidthMm, labelHeightMm);
+      return;
+    }
+  }
+
+  // Fallback for pure ASCII or in non-browser environments (e.g. Node tests):
+  doc.setTextColor(...COLORS.mutedText);
+  doc.setFont('helvetica', 'bold');
+
+  let labelText = englishLabel;
+  // Only append gujaratiLabel if it does NOT contain non-ASCII (prevents jsPDF mojibake)
+  if (gujaratiLabel && !containsNonAscii(gujaratiLabel) && gujaratiLabel.toLowerCase() !== englishLabel.toLowerCase()) {
+    labelText = `${englishLabel} (${gujaratiLabel})`;
+  }
+
+  const maxW = boxW - 2;
+  const textWidth = doc.getTextWidth(labelText);
+  if (textWidth > maxW) {
+    doc.setFontSize(Math.max(4.8, 6.8 * (maxW / textWidth)));
+  } else {
+    doc.setFontSize(6.8);
+  }
+  doc.text(labelText, bx + boxW / 2, by + 4.5, { align: 'center', maxWidth: maxW });
+};
+
+/**
+ * Universal text drawer that handles Unicode / Gujarati strings by rendering via high-DPI canvas
+ * when necessary, avoiding jsPDF's built-in font Unicode limitations.
+ */
+const drawSmartText = (doc, text, x, y, options = {}) => {
+  const str = String(text || '').trim();
+  if (!str) return;
+
+  const {
+    fontSize = 8.5,
+    fontStyle = 'normal',
+    color = COLORS.darkText,
+    maxWidth = 100,
+    align = 'left',
+  } = options;
+
+  if (containsNonAscii(str) && typeof document !== 'undefined') {
+    const heightMm = Math.max(4.2, fontSize * 0.44);
+    const hexColor = Array.isArray(color)
+      ? `#${color.map((c) => c.toString(16).padStart(2, '0')).join('')}`
+      : color;
+
+    const dataUrl = renderTextToImage(str, {
+      widthMm: maxWidth,
+      heightMm: heightMm,
+      color: hexColor,
+      fontSizePt: fontSize,
+      fontWeight: fontStyle === 'bold' ? 'bold' : 'normal',
+      align,
+    });
+
+    if (dataUrl) {
+      const imgX = align === 'center' ? x - maxWidth / 2 : align === 'right' ? x - maxWidth : x;
+      doc.addImage(dataUrl, 'PNG', imgX, y - heightMm * 0.72, maxWidth, heightMm);
+      return;
+    }
+  }
+
+  // Standard jsPDF vector text for pure ASCII
+  doc.setFont('helvetica', fontStyle);
+  if (Array.isArray(color)) {
+    doc.setTextColor(...color);
+  } else {
+    doc.setTextColor(color);
+  }
+  doc.setFontSize(fontSize);
+
+  // In non-browser environments (e.g. Node tests), sanitize non-ASCII so WinAnsi doesn't mangle
+  const safeStr = typeof document === 'undefined' && containsNonAscii(str)
+    ? str.replace(/[^\x00-\x7F]/g, '')
+    : str;
+
+  doc.text(safeStr, x, y, { align, maxWidth });
+};
+
+/**
  * Format pattern names from order data with human labels and custom patterns
  */
 const getPatternsDisplay = (garment, category = 'shirt') => {
@@ -68,7 +287,7 @@ const resolvePdfFields = (category, measurements = {}, snapshotList = [], tenant
     });
   }
 
-  // 1. Process Order Snapshot if present (preserves historical naming & order)
+  // 1. Process Order Snapshot if present (preserves historical naming, ordering & values exactly)
   if (Array.isArray(snapshotList) && snapshotList.length > 0) {
     snapshotList.forEach((s) => {
       const k = s.fieldKey;
@@ -91,42 +310,12 @@ const resolvePdfFields = (category, measurements = {}, snapshotList = [], tenant
         val: finalVal,
       });
     });
+
+    return result;
   }
 
-  // 2. Process Tenant Definitions not in snapshot (e.g., newly added definitions or orders without snapshot)
-  if (Array.isArray(tenantDefs) && tenantDefs.length > 0) {
-    tenantDefs.forEach((def) => {
-      const k = def.fieldKey;
-      if (!handledKeys.has(k) && !handledKeys.has(norm(k))) {
-        handledKeys.add(k);
-        handledKeys.add(norm(k));
-        const liveVal = getFieldValue(measurements, k);
-        result.push({
-          key: k,
-          label: def.displayName || k,
-          gujaratiLabel: def.gujaratiName || '',
-          val: liveVal !== '' ? String(liveVal) : '-',
-        });
-      }
-    });
-  } else if ((!snapshotList || snapshotList.length === 0) && !Array.isArray(tenantDefs)) {
-    // Fallback to baseline fields if neither snapshot nor tenant definitions are available
-    const baseFields = category === 'shirt' ? SHIRT_FIELDS : PANT_FIELDS;
-    baseFields.forEach((f) => {
-      const k = f.key;
-      handledKeys.add(k);
-      handledKeys.add(norm(k));
-      const liveVal = getFieldValue(measurements, k);
-      result.push({
-        key: k,
-        label: f.label,
-        gujaratiLabel: f.gujaratiLabel || '',
-        val: liveVal !== '' ? String(liveVal) : '-',
-      });
-    });
-  }
-
-  // 3. Process ANY remaining raw measurement keys in the order (custom fields, historical values)
+  // 2. For legacy orders without a snapshot:
+  // Render ONLY the measurement fields that actually have saved, non-empty values in this order!
   Object.keys(measurements || {}).forEach((k) => {
     if (
       k !== 'notes' &&
@@ -191,7 +380,7 @@ export const generateOrderSlipPdf = (order, user = null, options = {}) => {
   doc.setTextColor(...COLORS.white);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  const shopName = (user?.shopName || 'SILAI MASTER').toUpperCase();
+  const shopName = (user?.tenant?.businessName || user?.shopName || 'SILAI MASTER').toUpperCase();
   doc.text(shopName, margin + 8, y + 10);
 
   // Subtitle
@@ -239,9 +428,13 @@ export const generateOrderSlipPdf = (order, user = null, options = {}) => {
 
   doc.setTextColor(...COLORS.darkText);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
   const custName = order.customerSnapshot?.name || order.customer?.name || 'Walk-in Customer';
-  doc.text(custName.length > 30 ? custName.substring(0, 30) + '...' : custName, margin + 5, y + 14);
+  drawSmartText(doc, custName.length > 30 ? custName.substring(0, 30) + '...' : custName, margin + 5, y + 14, {
+    fontSize: 10,
+    fontStyle: 'bold',
+    color: COLORS.darkText,
+    maxWidth: colWidth - 10,
+  });
 
   doc.setTextColor(...COLORS.mutedText);
   doc.setFont('helvetica', 'normal');
@@ -252,7 +445,12 @@ export const generateOrderSlipPdf = (order, user = null, options = {}) => {
   const address = order.customerSnapshot?.address || order.customer?.address || '';
   if (address) {
     const cleanAddr = address.length > 38 ? address.substring(0, 38) + '...' : address;
-    doc.text(`Address: ${cleanAddr}`, margin + 5, y + 26);
+    drawSmartText(doc, `Address: ${cleanAddr}`, margin + 5, y + 26, {
+      fontSize: 8.5,
+      fontStyle: 'normal',
+      color: COLORS.mutedText,
+      maxWidth: colWidth - 10,
+    });
   }
 
   // Order Details Card (Right)
@@ -330,10 +528,13 @@ export const generateOrderSlipPdf = (order, user = null, options = {}) => {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.text('Selected Patterns / Styling:', margin + 4, y + 4.5);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...COLORS.darkText);
     const sPatTruncated = sPatternsText.length > 80 ? sPatternsText.substring(0, 80) + '...' : sPatternsText;
-    doc.text(sPatTruncated, margin + 46, y + 4.5);
+    drawSmartText(doc, sPatTruncated, margin + 46, y + 4.5, {
+      fontSize: 8,
+      fontStyle: 'normal',
+      color: COLORS.darkText,
+      maxWidth: contentWidth - 50,
+    });
 
     y += 9;
 
@@ -355,21 +556,8 @@ export const generateOrderSlipPdf = (order, user = null, options = {}) => {
       doc.setLineWidth(0.25);
       doc.roundedRect(bx, by, boxW, boxH, 1.5, 1.5, 'FD');
 
-      // Label (English name + optional Gujarati in parentheses)
-      doc.setTextColor(...COLORS.mutedText);
-      doc.setFont('helvetica', 'bold');
-      let labelText = field.label || field.key;
-      if (field.gujaratiLabel) {
-        labelText = `${labelText} (${field.gujaratiLabel})`;
-      }
-      const maxW = boxW - 2;
-      const textWidth = doc.getTextWidth(labelText);
-      if (textWidth > maxW) {
-        doc.setFontSize(Math.max(4.8, 6.8 * (maxW / textWidth)));
-      } else {
-        doc.setFontSize(6.8);
-      }
-      doc.text(labelText, bx + boxW / 2, by + 4.5, { align: 'center', maxWidth: maxW });
+      // Label (English name + optional Gujarati in parentheses, rendered cleanly without mojibake)
+      drawMeasurementBoxLabel(doc, field, bx, by, boxW, boxH);
 
       // Measurement Value
       doc.setTextColor(...COLORS.primaryNavy);
@@ -386,10 +574,12 @@ export const generateOrderSlipPdf = (order, user = null, options = {}) => {
       doc.setFillColor(254, 252, 232);
       doc.setDrawColor(254, 240, 138);
       doc.roundedRect(margin, y, contentWidth, 6, 1, 1, 'FD');
-      doc.setTextColor(...COLORS.darkText);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.text(`Shirt Notes: ${sMeasurements.notes}`, margin + 4, y + 4.2);
+      drawSmartText(doc, `Shirt Notes: ${sMeasurements.notes}`, margin + 4, y + 4.2, {
+        fontSize: 7.5,
+        fontStyle: 'bold',
+        color: COLORS.darkText,
+        maxWidth: contentWidth - 8,
+      });
       y += 8;
     }
   }
@@ -422,10 +612,13 @@ export const generateOrderSlipPdf = (order, user = null, options = {}) => {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.text('Selected Patterns / Styling:', margin + 4, y + 4.5);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...COLORS.darkText);
     const pPatTruncated = pPatternsText.length > 80 ? pPatternsText.substring(0, 80) + '...' : pPatternsText;
-    doc.text(pPatTruncated, margin + 46, y + 4.5);
+    drawSmartText(doc, pPatTruncated, margin + 46, y + 4.5, {
+      fontSize: 8,
+      fontStyle: 'normal',
+      color: COLORS.darkText,
+      maxWidth: contentWidth - 50,
+    });
 
     y += 9;
 
@@ -447,21 +640,8 @@ export const generateOrderSlipPdf = (order, user = null, options = {}) => {
       doc.setLineWidth(0.25);
       doc.roundedRect(bx, by, boxW, boxH, 1.5, 1.5, 'FD');
 
-      // Label (English name + optional Gujarati in parentheses)
-      doc.setTextColor(...COLORS.mutedText);
-      doc.setFont('helvetica', 'bold');
-      let labelText = field.label || field.key;
-      if (field.gujaratiLabel) {
-        labelText = `${labelText} (${field.gujaratiLabel})`;
-      }
-      const maxW = boxW - 2;
-      const textWidth = doc.getTextWidth(labelText);
-      if (textWidth > maxW) {
-        doc.setFontSize(Math.max(4.8, 6.8 * (maxW / textWidth)));
-      } else {
-        doc.setFontSize(6.8);
-      }
-      doc.text(labelText, bx + boxW / 2, by + 4.5, { align: 'center', maxWidth: maxW });
+      // Label (English name + optional Gujarati in parentheses, rendered cleanly without mojibake)
+      drawMeasurementBoxLabel(doc, field, bx, by, boxW, boxH);
 
       // Measurement Value
       doc.setTextColor(...COLORS.primaryNavy);
@@ -478,10 +658,12 @@ export const generateOrderSlipPdf = (order, user = null, options = {}) => {
       doc.setFillColor(254, 252, 232);
       doc.setDrawColor(254, 240, 138);
       doc.roundedRect(margin, y, contentWidth, 6, 1, 1, 'FD');
-      doc.setTextColor(...COLORS.darkText);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.text(`Pant Notes: ${pMeasurements.notes}`, margin + 4, y + 4.2);
+      drawSmartText(doc, `Pant Notes: ${pMeasurements.notes}`, margin + 4, y + 4.2, {
+        fontSize: 7.5,
+        fontStyle: 'bold',
+        color: COLORS.darkText,
+        maxWidth: contentWidth - 8,
+      });
       y += 8;
     }
   }
@@ -498,11 +680,13 @@ export const generateOrderSlipPdf = (order, user = null, options = {}) => {
     doc.setFontSize(8);
     doc.text('SPECIAL WORKSHOP INSTRUCTIONS:', margin + 4, y + 5);
 
-    doc.setTextColor(...COLORS.darkText);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
     const instText = String(order.specialInstructions).trim();
-    doc.text(instText.length > 105 ? instText.substring(0, 105) + '...' : instText, margin + 4, y + 10);
+    drawSmartText(doc, instText.length > 105 ? instText.substring(0, 105) + '...' : instText, margin + 4, y + 10, {
+      fontSize: 8,
+      fontStyle: 'normal',
+      color: COLORS.darkText,
+      maxWidth: contentWidth - 8,
+    });
 
     y += 18;
   } else {
@@ -553,8 +737,9 @@ export const generateOrderSlipPdf = (order, user = null, options = {}) => {
   doc.setTextColor(...COLORS.white);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
+  const footerShop = user?.tenant?.businessName || user?.shopName || 'Tailor Studio';
   doc.text(
-    `Generated on ${new Date().toLocaleString()}  •  Silai Master Tailor Management System  •  Professional Work Order`,
+    `Generated on ${new Date().toLocaleString()}  •  ${footerShop} Tailor Management System  •  Professional Work Order`,
     pageWidth / 2,
     pageHeight - 2.5,
     { align: 'center' }

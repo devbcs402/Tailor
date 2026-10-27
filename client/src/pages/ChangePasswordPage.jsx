@@ -20,6 +20,11 @@ export const ChangePasswordPage = () => {
   const { success } = useToast();
   const navigate = useNavigate();
 
+  React.useEffect(() => {
+    const businessName = user?.tenant?.businessName || user?.shopName || 'Tailor Studio';
+    document.title = `Change Password | ${businessName}`;
+  }, [user]);
+
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');

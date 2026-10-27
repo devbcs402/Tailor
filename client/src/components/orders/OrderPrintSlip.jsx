@@ -194,7 +194,7 @@ export const OrderPrintSlip = ({ order, onClose }) => {
           {/* Shop Header */}
           <div style={{ textAlign: 'center', borderBottom: '2px dashed #cbd5e1', paddingBottom: '16px', marginBottom: '20px' }}>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0b1f3a', marginBottom: '4px' }}>
-              SILAI MASTER TAILOR STUDIO
+              {(user?.tenant?.businessName || user?.shopName || 'Silai Master').toUpperCase()}
             </h2>
             <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
               Men's Wear • Bespoke Shirts & Trousers • Tailoring Slip
@@ -310,7 +310,7 @@ export const OrderPrintSlip = ({ order, onClose }) => {
           {/* Clean Slip Footer */}
           <div style={{ borderTop: '2px solid #0b1f3a', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
-              Silai Master • Thank you for your business!
+              {user?.tenant?.businessName || user?.shopName || 'Silai Master'} • Thank you for your business!
             </div>
           </div>
         </div>

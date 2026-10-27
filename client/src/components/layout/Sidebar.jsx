@@ -18,6 +18,8 @@ export const Sidebar = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const businessName = user?.tenant?.businessName || user?.shopName || 'Silai Master';
+
   // Prevent background content from scrolling when mobile drawer is open
   React.useEffect(() => {
     if (isOpen) {
@@ -94,7 +96,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
             flexShrink: 0,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
             <div
               style={{
                 width: '42px',
@@ -106,13 +108,25 @@ export const Sidebar = ({ isOpen, onClose }) => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 boxShadow: '0 4px 14px rgba(212, 175, 55, 0.25)',
+                flexShrink: 0,
               }}
             >
               <Scissors size={22} color="#d4af37" />
             </div>
-            <div>
-              <div style={{ fontWeight: 800, fontSize: '1.2rem', letterSpacing: '-0.02em', color: '#ffffff' }}>
-                Silai Master
+            <div style={{ minWidth: 0, overflow: 'hidden' }}>
+              <div
+                title={businessName}
+                style={{
+                  fontWeight: 800,
+                  fontSize: '1.15rem',
+                  letterSpacing: '-0.02em',
+                  color: '#ffffff',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {businessName}
               </div>
               <div style={{ fontSize: '0.74rem', color: '#d4af37', letterSpacing: '0.06em', fontWeight: 700 }}>
                 TAILOR STUDIO

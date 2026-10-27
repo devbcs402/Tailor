@@ -14,6 +14,10 @@ export const OwnerLoginPage = () => {
   const { success, error: toastError } = useToast();
   const navigate = useNavigate();
 
+  React.useEffect(() => {
+    document.title = 'Platform Owner Login | Tailor Management System';
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
