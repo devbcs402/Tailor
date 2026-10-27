@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { Order } from '../models/Order.js';
 import { Customer } from '../models/Customer.js';
+import { MeasurementDefinition } from '../models/MeasurementDefinition.js';
 import { generateNextOrderNumber } from '../models/OrderCounter.js';
 
 export const REQUIRED_SHIRT_FIELDS = ['length', 'chest', 'waist', 'shoulder', 'sleeveLength'];
@@ -15,7 +16,7 @@ export const validateGarmentMeasurements = (measurements = {}, requiredFields, g
   }
 
   for (const [key, val] of Object.entries(measurements)) {
-    if (key !== 'notes' && val !== undefined && val !== null && String(val).trim() !== '') {
+    if (key !== 'notes' && key !== '_id' && val !== undefined && val !== null && String(val).trim() !== '') {
       const num = parseFloat(val);
       if (isNaN(num) || num <= 0) {
         return `${garmentName.charAt(0).toUpperCase() + garmentName.slice(1)} measurement "${key}" must be a valid positive number.`;
@@ -24,6 +25,136 @@ export const validateGarmentMeasurements = (measurements = {}, requiredFields, g
   }
 
   return null;
+};
+
+const normalizeKey = (k) => String(k || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const TAILOR_ALIASES = {
+  bottomopening: ['bottom', 'mori', 'bottomopening', 'bottom_opening'],
+  crotchrise: ['rise', 'crotch', 'crotchrise', 'crotch_rise', 'latak'],
+  sleeveopening: ['cuff', 'sleeveopening', 'sleeve_opening', 'cuffopening'],
+  neck: ['collar', 'neck'],
+  sleevelength: ['sleeve', 'sleevelength', 'sleeve_length'],
+  hip: ['seat', 'hip'],
+};
+
+const getMeasurementVal = (measurements, targetKey) => {
+  if (!measurements) return undefined;
+  const directVal = measurements[targetKey];
+  if (directVal !== undefined && directVal !== null && String(directVal).trim() !== '') {
+    return directVal;
+  }
+
+  const normTarget = normalizeKey(targetKey);
+  for (const [k, v] of Object.entries(measurements)) {
+    if (normalizeKey(k) === normTarget && v !== undefined && v !== null && String(v).trim() !== '') {
+      return v;
+    }
+  }
+
+  const aliasList = TAILOR_ALIASES[normTarget];
+  if (aliasList) {
+    for (const alias of aliasList) {
+      for (const [k, v] of Object.entries(measurements)) {
+        if (normalizeKey(k) === normalizeKey(alias) && v !== undefined && v !== null && String(v).trim() !== '') {
+          return v;
+        }
+      }
+    }
+  }
+
+  return directVal;
+};
+
+const toPlainObj = (obj) => {
+  if (!obj) return {};
+  if (typeof obj.toObject === 'function') return obj.toObject();
+  if (typeof obj._doc === 'object' && obj._doc !== null) return { ...obj._doc };
+  return { ...obj };
+};
+
+export const validateMeasurementsWithDefinitions = (rawMeasurements = {}, definitions = [], garmentName) => {
+  const measurements = toPlainObj(rawMeasurements);
+  if (definitions && definitions.length > 0) {
+    const defMap = new Map(definitions.map((d) => [d.fieldKey, d]));
+
+    // Check required definitions
+    for (const def of definitions) {
+      if (def.isActive && def.isRequired) {
+        const val = getMeasurementVal(measurements, def.fieldKey);
+        if (val === undefined || val === null || String(val).trim() === '') {
+          return `Required ${garmentName} measurement "${def.displayName}" is missing.`;
+        }
+      }
+    }
+
+    // Validate types for all entered values
+    for (const [key, val] of Object.entries(measurements)) {
+      if (key.startsWith('$') || key.startsWith('_') || key === 'notes' || key === 'isNew') {
+        continue;
+      }
+      if (val !== undefined && val !== null && String(val).trim() !== '') {
+        const def = defMap.get(key) || definitions.find((d) => normalizeKey(d.fieldKey) === normalizeKey(key));
+        if (def && def.fieldType === 'text') {
+          continue;
+        }
+        if (!def || def.fieldType === 'number') {
+          const num = parseFloat(val);
+          if (isNaN(num) || num <= 0) {
+            const label = def ? def.displayName : key;
+            return `${garmentName.charAt(0).toUpperCase() + garmentName.slice(1)} measurement "${label}" must be a valid positive number.`;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  // Fallback if no definitions exist
+  const defaultRequired = garmentName === 'shirt' ? REQUIRED_SHIRT_FIELDS : REQUIRED_PANT_FIELDS;
+  return validateGarmentMeasurements(measurements, defaultRequired, garmentName);
+};
+
+export const buildMeasurementSnapshot = (rawMeasurements = {}, definitions = []) => {
+  const measurements = toPlainObj(rawMeasurements);
+  const snapshot = [];
+  const handledKeys = new Set();
+
+  for (const def of definitions) {
+    const val = getMeasurementVal(measurements, def.fieldKey);
+    if (val !== undefined && val !== null && String(val).trim() !== '') {
+      const parsedVal = (def.fieldType === 'number' && !isNaN(Number(val))) ? Number(val) : String(val).trim();
+      snapshot.push({
+        fieldKey: def.fieldKey,
+        displayName: def.displayName,
+        gujaratiName: def.gujaratiName || '',
+        fieldType: def.fieldType || 'number',
+        unit: def.unit || '',
+        value: parsedVal,
+      });
+      handledKeys.add(def.fieldKey);
+    }
+  }
+
+  // Include any custom or historical keys not in definitions
+  for (const [key, val] of Object.entries(measurements)) {
+    if (key.startsWith('$') || key.startsWith('_') || key === 'notes' || key === 'isNew' || handledKeys.has(key)) {
+      continue;
+    }
+    if (val !== undefined && val !== null && String(val).trim() !== '') {
+      const parsedVal = !isNaN(Number(val)) ? Number(val) : String(val).trim();
+      snapshot.push({
+        fieldKey: key,
+        displayName: key.charAt(0).toUpperCase() + key.slice(1),
+        gujaratiName: '',
+        fieldType: !isNaN(Number(val)) ? 'number' : 'text',
+        unit: '',
+        value: parsedVal,
+      });
+    }
+  }
+
+  return snapshot;
 };
 
 export const getOrders = async (req, res, next) => {
@@ -151,6 +282,7 @@ export const getOrderById = async (req, res, next) => {
 
 export const createOrder = async (req, res, next) => {
   try {
+    const tenantId = req.user.tenantId;
     const {
       isNewCustomer,
       customerId,
@@ -158,7 +290,7 @@ export const createOrder = async (req, res, next) => {
       orderDate,
       deadline,
       deliveryTime,
-      measurementUnit = 'inch',
+      measurementUnit = '',
       shirt = {},
       pant = {},
       specialInstructions = '',
@@ -196,9 +328,14 @@ export const createOrder = async (req, res, next) => {
       });
     }
 
-    // Validate required measurements for garments with positive quantity
+    // Fetch active definitions for this tenant
+    const tenantDefinitions = await MeasurementDefinition.find({ tenantId, isActive: true }).lean();
+    const shirtDefs = tenantDefinitions.filter((d) => d.category === 'shirt_measurement');
+    const pantDefs = tenantDefinitions.filter((d) => d.category === 'pant_measurement');
+
+    // Validate measurements for garments with positive quantity
     if (shirtQty > 0) {
-      const shirtErr = validateGarmentMeasurements(shirt.measurements, REQUIRED_SHIRT_FIELDS, 'shirt');
+      const shirtErr = validateMeasurementsWithDefinitions(shirt.measurements, shirtDefs, 'shirt');
       if (shirtErr) {
         return res.status(400).json({
           success: false,
@@ -208,7 +345,7 @@ export const createOrder = async (req, res, next) => {
     }
 
     if (pantQty > 0) {
-      const pantErr = validateGarmentMeasurements(pant.measurements, REQUIRED_PANT_FIELDS, 'pant');
+      const pantErr = validateMeasurementsWithDefinitions(pant.measurements, pantDefs, 'pant');
       if (pantErr) {
         return res.status(400).json({
           success: false,
@@ -234,7 +371,6 @@ export const createOrder = async (req, res, next) => {
       : (pant.pattern !== undefined ? String(pant.pattern).trim() : '');
 
     let targetCustomer;
-    const tenantId = req.user.tenantId;
 
     // Handle New vs Existing Customer
     if (isNewCustomer) {
@@ -278,7 +414,7 @@ export const createOrder = async (req, res, next) => {
         address: address ? address.trim() : '',
         notes: notes ? notes.trim() : '',
         latestMeasurements: {
-          unit: measurementUnit,
+          unit: measurementUnit || '',
           shirt: shirtQty > 0 ? (shirt.measurements || {}) : {},
           shirtPatterns: shirtPatternsList,
           shirtPattern: shirtPatternCombined,
@@ -293,7 +429,8 @@ export const createOrder = async (req, res, next) => {
 
       await targetCustomer.save();
     } else {
-      if (!customerId) {
+      const activeCustomerId = customerId || req.body.customer;
+      if (!activeCustomerId) {
         return res.status(400).json({
           success: false,
           message: 'Please select a customer',
@@ -301,7 +438,7 @@ export const createOrder = async (req, res, next) => {
       }
 
       // Ensure customer belongs strictly to this tenant
-      targetCustomer = await Customer.findOne({ _id: customerId, tenantId });
+      targetCustomer = await Customer.findOne({ _id: activeCustomerId, tenantId });
       if (!targetCustomer) {
         return res.status(404).json({
           success: false,
@@ -314,7 +451,7 @@ export const createOrder = async (req, res, next) => {
       if (shouldSaveDefaults) {
         const existingLm = targetCustomer.latestMeasurements || {};
         targetCustomer.latestMeasurements = {
-          unit: measurementUnit || existingLm.unit || 'inch',
+          unit: measurementUnit || existingLm.unit || '',
           shirt: shirtQty > 0 ? (shirt.measurements || {}) : (existingLm.shirt || {}),
           shirtPatterns: shirtQty > 0 ? shirtPatternsList : (existingLm.shirtPatterns || []),
           shirtPattern: shirtQty > 0 ? shirtPatternCombined : (existingLm.shirtPattern || ''),
@@ -361,6 +498,10 @@ export const createOrder = async (req, res, next) => {
         measurements: pantQty > 0 ? (pant.measurements || {}) : {},
       },
       specialInstructions: specialInstructions ? specialInstructions.trim() : '',
+      measurementSnapshot: {
+        shirt: shirtQty > 0 ? buildMeasurementSnapshot(shirt.measurements, shirtDefs) : [],
+        pant: pantQty > 0 ? buildMeasurementSnapshot(pant.measurements, pantDefs) : [],
+      },
       pricing: {
         shirtPrice: 0,
         pantPrice: 0,
@@ -523,6 +664,10 @@ export const updateOrder = async (req, res, next) => {
           ? String(shirt.pattern).trim()
           : (updatedPatterns.length > 0 ? updatedPatterns.join(', ') : (existingShirt.pattern || ''));
 
+        const mergedShirtMeasurements = shirt.measurements !== undefined
+          ? { ...(existingShirt.measurements || {}), ...shirt.measurements }
+          : (existingShirt.measurements || {});
+
         order.shirt = {
           ...existingShirt,
           ...shirt,
@@ -530,7 +675,7 @@ export const updateOrder = async (req, res, next) => {
           patterns: updatedPatterns,
           customPattern: updatedCustom,
           pattern: updatedPatternStr,
-          measurements: shirt.measurements !== undefined ? shirt.measurements : (existingShirt.measurements || {}),
+          measurements: mergedShirtMeasurements,
         };
       }
     }
@@ -562,6 +707,10 @@ export const updateOrder = async (req, res, next) => {
           ? String(pant.pattern).trim()
           : (updatedPatterns.length > 0 ? updatedPatterns.join(', ') : (existingPant.pattern || ''));
 
+        const mergedPantMeasurements = pant.measurements !== undefined
+          ? { ...(existingPant.measurements || {}), ...pant.measurements }
+          : (existingPant.measurements || {});
+
         order.pant = {
           ...existingPant,
           ...pant,
@@ -569,7 +718,7 @@ export const updateOrder = async (req, res, next) => {
           patterns: updatedPatterns,
           customPattern: updatedCustom,
           pattern: updatedPatternStr,
-          measurements: pant.measurements !== undefined ? pant.measurements : (existingPant.measurements || {}),
+          measurements: mergedPantMeasurements,
         };
       }
     }
@@ -581,8 +730,12 @@ export const updateOrder = async (req, res, next) => {
       });
     }
 
+    const tenantDefinitions = await MeasurementDefinition.find({ tenantId, isActive: true }).lean();
+    const shirtDefs = tenantDefinitions.filter((d) => d.category === 'shirt_measurement');
+    const pantDefs = tenantDefinitions.filter((d) => d.category === 'pant_measurement');
+
     if ((order.shirt?.quantity || 0) > 0) {
-      const shirtErr = validateGarmentMeasurements(order.shirt.measurements, REQUIRED_SHIRT_FIELDS, 'shirt');
+      const shirtErr = validateMeasurementsWithDefinitions(order.shirt.measurements, shirtDefs, 'shirt');
       if (shirtErr) {
         return res.status(400).json({
           success: false,
@@ -592,7 +745,7 @@ export const updateOrder = async (req, res, next) => {
     }
 
     if ((order.pant?.quantity || 0) > 0) {
-      const pantErr = validateGarmentMeasurements(order.pant.measurements, REQUIRED_PANT_FIELDS, 'pant');
+      const pantErr = validateMeasurementsWithDefinitions(order.pant.measurements, pantDefs, 'pant');
       if (pantErr) {
         return res.status(400).json({
           success: false,
@@ -600,6 +753,12 @@ export const updateOrder = async (req, res, next) => {
         });
       }
     }
+
+    // Refresh measurement snapshot
+    order.measurementSnapshot = {
+      shirt: (order.shirt?.quantity || 0) > 0 ? buildMeasurementSnapshot(order.shirt.measurements, shirtDefs) : [],
+      pant: (order.pant?.quantity || 0) > 0 ? buildMeasurementSnapshot(order.pant.measurements, pantDefs) : [],
+    };
 
     if (specialInstructions !== undefined) {
       order.specialInstructions = specialInstructions ? specialInstructions.trim() : '';
@@ -611,22 +770,31 @@ export const updateOrder = async (req, res, next) => {
     if (shouldSaveAsCustomerDefaults && order.customer) {
       const targetCustomer = await Customer.findOne({ _id: order.customer, tenantId });
       if (targetCustomer) {
-        const existingLm = targetCustomer.latestMeasurements || {};
+        const existingLm = targetCustomer.latestMeasurements ? targetCustomer.latestMeasurements.toObject() : {};
         targetCustomer.latestMeasurements = {
-          unit: order.measurementUnit || existingLm.unit || 'inch',
-          shirt: order.shirt?.quantity > 0 ? (order.shirt.measurements || {}) : (existingLm.shirt || {}),
-          shirtPatterns: order.shirt?.quantity > 0 ? (order.shirt.patterns || []) : (existingLm.shirtPatterns || []),
-          shirtPattern: order.shirt?.quantity > 0 ? (order.shirt.pattern || '') : (existingLm.shirtPattern || ''),
-          shirtCustomPattern: order.shirt?.quantity > 0 ? (order.shirt.customPattern || '') : (existingLm.shirtCustomPattern || ''),
-          pant: order.pant?.quantity > 0 ? (order.pant.measurements || {}) : (existingLm.pant || {}),
-          pantPatterns: order.pant?.quantity > 0 ? (order.pant.patterns || []) : (existingLm.pantPatterns || []),
-          pantPattern: order.pant?.quantity > 0 ? (order.pant.pattern || '') : (existingLm.pantPattern || ''),
-          pantCustomPattern: order.pant?.quantity > 0 ? (order.pant.customPattern || '') : (existingLm.pantCustomPattern || ''),
+          unit: order.measurementUnit || existingLm.unit || '',
+          shirt: (order.shirt?.quantity || 0) > 0 ? (order.shirt.measurements || {}) : (existingLm.shirt || {}),
+          shirtPatterns: (order.shirt?.quantity || 0) > 0 ? (order.shirt.patterns || []) : (existingLm.shirtPatterns || []),
+          shirtPattern: (order.shirt?.quantity || 0) > 0 ? (order.shirt.pattern || '') : (existingLm.shirtPattern || ''),
+          shirtCustomPattern: (order.shirt?.quantity || 0) > 0 ? (order.shirt.customPattern || '') : (existingLm.shirtCustomPattern || ''),
+          pant: (order.pant?.quantity || 0) > 0 ? (order.pant.measurements || {}) : (existingLm.pant || {}),
+          pantPatterns: (order.pant?.quantity || 0) > 0 ? (order.pant.patterns || []) : (existingLm.pantPatterns || []),
+          pantPattern: (order.pant?.quantity || 0) > 0 ? (order.pant.pattern || '') : (existingLm.pantPattern || ''),
+          pantCustomPattern: (order.pant?.quantity || 0) > 0 ? (order.pant.customPattern || '') : (existingLm.pantCustomPattern || ''),
           updatedAt: new Date(),
         };
+        targetCustomer.markModified('latestMeasurements');
+        targetCustomer.markModified('latestMeasurements.shirt');
+        targetCustomer.markModified('latestMeasurements.pant');
         await targetCustomer.save();
       }
     }
+
+    order.markModified('shirt');
+    order.markModified('shirt.measurements');
+    order.markModified('pant');
+    order.markModified('pant.measurements');
+    order.markModified('measurementSnapshot');
 
     await order.save();
     await order.populate('customer');

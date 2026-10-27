@@ -12,7 +12,7 @@ const shirtMeasurementSchema = new mongoose.Schema(
     frontChest: { type: String, default: '' }, // Front Chest
     notes: { type: String, default: '' }, // Notes
   },
-  { _id: false }
+  { _id: false, strict: false }
 );
 
 const pantMeasurementSchema = new mongoose.Schema(
@@ -26,14 +26,14 @@ const pantMeasurementSchema = new mongoose.Schema(
     crotchRise: { type: String, default: '' }, // Crotch / Rise
     notes: { type: String, default: '' }, // Notes
   },
-  { _id: false }
+  { _id: false, strict: false }
 );
 
 const latestMeasurementsSchema = new mongoose.Schema(
   {
     unit: {
       type: String,
-      default: 'inch',
+      default: '',
     },
     shirt: {
       type: shirtMeasurementSchema,

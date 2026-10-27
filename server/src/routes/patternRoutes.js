@@ -4,6 +4,7 @@ import {
   createPattern,
   updatePattern,
   deletePattern,
+  togglePatternStatus,
 } from '../controllers/patternController.js';
 import { requireAuth } from '../middleware/authMiddleware.js';
 
@@ -13,6 +14,7 @@ router.use(requireAuth);
 
 router.get('/', getPatterns);
 router.post('/', createPattern);
+router.patch('/:id/status', togglePatternStatus);
 router.patch('/:id', updatePattern);
 router.put('/:id', updatePattern);
 router.delete('/:id', deletePattern);

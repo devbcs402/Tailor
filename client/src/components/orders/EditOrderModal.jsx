@@ -4,10 +4,12 @@ import { ShirtMeasurements } from './ShirtMeasurements';
 import { PantMeasurements } from './PantMeasurements';
 import { ordersApi } from '../../api/ordersApi';
 import { useToast } from '../../context/ToastContext';
-import { REQUIRED_SHIRT_FIELDS, REQUIRED_PANT_FIELDS } from '../../utils/measurementLabels';
+import { REQUIRED_SHIRT_FIELDS, REQUIRED_PANT_FIELDS, getFieldValue } from '../../utils/measurementLabels';
+import { useTenantMeasurements } from '../../hooks/useTenantMeasurements';
 
 export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
   const { success, error: toastError } = useToast();
+  const { shirtDefinitions, pantDefinitions } = useTenantMeasurements();
 
   const [deadline, setDeadline] = useState('');
   const [deliveryTime, setDeliveryTime] = useState('');
@@ -41,7 +43,15 @@ export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
         : (order.shirt?.pattern ? order.shirt.pattern.split(',').map((s) => s.trim()).filter(Boolean) : []);
       setShirtPatterns(sPatterns);
       setShirtCustomPattern(order.shirt?.customPattern || '');
-      setShirtMeasurements(order.shirt?.measurements ? { ...order.shirt.measurements } : {});
+      const sMeasurements = { ...(order.shirt?.measurements || {}) };
+      if (Array.isArray(order.measurementSnapshot?.shirt)) {
+        order.measurementSnapshot.shirt.forEach((item) => {
+          if (item.fieldKey && sMeasurements[item.fieldKey] === undefined && item.value !== undefined) {
+            sMeasurements[item.fieldKey] = item.value;
+          }
+        });
+      }
+      setShirtMeasurements(sMeasurements);
 
       setPantQuantity(order.pant?.quantity ?? 1);
       const pPatterns = Array.isArray(order.pant?.patterns) && order.pant.patterns.length > 0
@@ -49,7 +59,16 @@ export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
         : (order.pant?.pattern ? order.pant.pattern.split(',').map((s) => s.trim()).filter(Boolean) : []);
       setPantPatterns(pPatterns);
       setPantCustomPattern(order.pant?.customPattern || '');
-      setPantMeasurements(order.pant?.measurements ? { ...order.pant.measurements } : {});
+
+      const pMeasurements = { ...(order.pant?.measurements || {}) };
+      if (Array.isArray(order.measurementSnapshot?.pant)) {
+        order.measurementSnapshot.pant.forEach((item) => {
+          if (item.fieldKey && pMeasurements[item.fieldKey] === undefined && item.value !== undefined) {
+            pMeasurements[item.fieldKey] = item.value;
+          }
+        });
+      }
+      setPantMeasurements(pMeasurements);
 
       setSaveAsDefaultMeasurements(false);
       setValidationError('');
@@ -80,39 +99,83 @@ export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
       return;
     }
 
-    // Quantity-based measurement validations
+    // Quantity-based dynamic measurement validations
     const newShirtErrors = {};
     const newPantErrors = {};
 
     if (sQty > 0) {
-      for (const field of REQUIRED_SHIRT_FIELDS) {
-        const val = shirtMeasurements[field];
-        if (val === undefined || val === null || String(val).trim() === '') {
-          newShirtErrors[field] = 'Required';
+      if (shirtDefinitions && shirtDefinitions.length > 0) {
+        for (const def of shirtDefinitions) {
+          if (def.isActive && def.isRequired) {
+            const val = getFieldValue(shirtMeasurements, def.fieldKey);
+            if (val === undefined || val === null || String(val).trim() === '') {
+              newShirtErrors[def.fieldKey] = 'Required';
+            }
+          }
         }
-      }
-      for (const [key, val] of Object.entries(shirtMeasurements)) {
-        if (key !== 'notes' && val !== undefined && val !== null && String(val).trim() !== '') {
-          const num = parseFloat(val);
-          if (isNaN(num) || num <= 0) {
-            newShirtErrors[key] = 'Must be > 0';
+        for (const [key, val] of Object.entries(shirtMeasurements)) {
+          if (key !== 'notes' && key !== '_id' && !key.startsWith('$') && !key.startsWith('_') && val !== undefined && val !== null && String(val).trim() !== '') {
+            const def = shirtDefinitions.find((d) => d.fieldKey === key);
+            if (!def || def.fieldType === 'number') {
+              const num = parseFloat(val);
+              if (isNaN(num) || num <= 0) {
+                newShirtErrors[key] = 'Must be > 0';
+              }
+            }
+          }
+        }
+      } else {
+        for (const field of REQUIRED_SHIRT_FIELDS) {
+          const val = getFieldValue(shirtMeasurements, field);
+          if (val === undefined || val === null || String(val).trim() === '') {
+            newShirtErrors[field] = 'Required';
+          }
+        }
+        for (const [key, val] of Object.entries(shirtMeasurements)) {
+          if (key !== 'notes' && !key.startsWith('$') && !key.startsWith('_') && val !== undefined && val !== null && String(val).trim() !== '') {
+            const num = parseFloat(val);
+            if (isNaN(num) || num <= 0) {
+              newShirtErrors[key] = 'Must be > 0';
+            }
           }
         }
       }
     }
 
     if (pQty > 0) {
-      for (const field of REQUIRED_PANT_FIELDS) {
-        const val = pantMeasurements[field];
-        if (val === undefined || val === null || String(val).trim() === '') {
-          newPantErrors[field] = 'Required';
+      if (pantDefinitions && pantDefinitions.length > 0) {
+        for (const def of pantDefinitions) {
+          if (def.isActive && def.isRequired) {
+            const val = getFieldValue(pantMeasurements, def.fieldKey);
+            if (val === undefined || val === null || String(val).trim() === '') {
+              newPantErrors[def.fieldKey] = 'Required';
+            }
+          }
         }
-      }
-      for (const [key, val] of Object.entries(pantMeasurements)) {
-        if (key !== 'notes' && val !== undefined && val !== null && String(val).trim() !== '') {
-          const num = parseFloat(val);
-          if (isNaN(num) || num <= 0) {
-            newPantErrors[key] = 'Must be > 0';
+        for (const [key, val] of Object.entries(pantMeasurements)) {
+          if (key !== 'notes' && key !== '_id' && !key.startsWith('$') && !key.startsWith('_') && val !== undefined && val !== null && String(val).trim() !== '') {
+            const def = pantDefinitions.find((d) => d.fieldKey === key);
+            if (!def || def.fieldType === 'number') {
+              const num = parseFloat(val);
+              if (isNaN(num) || num <= 0) {
+                newPantErrors[key] = 'Must be > 0';
+              }
+            }
+          }
+        }
+      } else {
+        for (const field of REQUIRED_PANT_FIELDS) {
+          const val = getFieldValue(pantMeasurements, field);
+          if (val === undefined || val === null || String(val).trim() === '') {
+            newPantErrors[field] = 'Required';
+          }
+        }
+        for (const [key, val] of Object.entries(pantMeasurements)) {
+          if (key !== 'notes' && !key.startsWith('$') && !key.startsWith('_') && val !== undefined && val !== null && String(val).trim() !== '') {
+            const num = parseFloat(val);
+            if (isNaN(num) || num <= 0) {
+              newPantErrors[key] = 'Must be > 0';
+            }
           }
         }
       }
@@ -271,6 +334,7 @@ export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
             }}
             errors={shirtErrors}
             onClearError={(key) => setShirtErrors((prev) => { const n = { ...prev }; delete n[key]; return n; })}
+            definitions={shirtDefinitions}
           />
 
           {/* Pant Measurements Section with dynamic pattern checkboxes */}
@@ -289,6 +353,7 @@ export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
             }}
             errors={pantErrors}
             onClearError={(key) => setPantErrors((prev) => { const n = { ...prev }; delete n[key]; return n; })}
+            definitions={pantDefinitions}
           />
 
           {/* Schedule & Notes */}

@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   Store,
   Layers,
+  Ruler,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -48,7 +49,7 @@ export const SettingsPage = () => {
               Settings (સેટિંગ્સ)
             </h2>
             <p style={{ fontSize: '0.9rem', color: '#cbd5e1', marginTop: '2px' }}>
-              Manage tailor shop preferences, garment pattern options, and studio configurations.
+              Manage tailor shop preferences, custom measurement fields, garment patterns, and studio configurations.
             </p>
           </div>
         </div>
@@ -56,6 +57,88 @@ export const SettingsPage = () => {
 
       {/* Settings Navigation Grid */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* Main Measurement Settings Navigation Card */}
+        <div
+          onClick={() => navigate('/settings/measurements')}
+          className="card"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '22px 24px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            border: '1.5px solid var(--border-light)',
+            borderLeft: '5px solid var(--primary)',
+            background: '#ffffff',
+            borderRadius: 'var(--radius-lg)',
+            boxShadow: 'var(--shadow-sm)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+            e.currentTarget.style.borderColor = 'var(--primary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'none';
+            e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+            e.currentTarget.style.borderColor = 'var(--border-light)';
+            e.currentTarget.style.borderLeft = '5px solid var(--primary)';
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
+            <div
+              style={{
+                width: '52px',
+                height: '52px',
+                borderRadius: '14px',
+                backgroundColor: 'var(--primary-light)',
+                color: 'var(--primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                border: '1px solid #bfdbfe',
+              }}
+            >
+              <Ruler size={26} color="var(--primary)" />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
+                  Measurement Settings
+                </h3>
+                <span style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 600 }}>
+                  (માપ સેટિંગ્સ)
+                </span>
+                <span style={{ fontSize: '0.74rem', padding: '2px 8px', borderRadius: '4px', backgroundColor: 'var(--accent-gold-light)', color: '#92400e', fontWeight: 700 }}>
+                  Custom Fields & Patterns
+                </span>
+              </div>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.4 }}>
+                Configure tenant-specific custom shirt and pant measurement definitions, Gujarati labels, and patterns.
+              </p>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              color: 'var(--primary)',
+              fontWeight: 700,
+              fontSize: '0.92rem',
+              padding: '8px 14px',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: 'var(--primary-light)',
+              flexShrink: 0,
+            }}
+          >
+            <span>Configure</span>
+            <ChevronRight size={18} />
+          </div>
+        </div>
         {/* Main Pattern Settings Navigation Card */}
         <div
           onClick={() => navigate('/settings/patterns')}

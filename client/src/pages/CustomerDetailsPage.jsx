@@ -89,7 +89,6 @@ export const CustomerDetailsPage = () => {
     setSavingMeasurements(true);
     try {
       const updatedMeasurements = {
-        unit: customer.latestMeasurements?.unit || 'inch',
         shirt: editShirt,
         shirtPatterns: editShirtPatterns,
         shirtPattern: editShirtPatterns.join(', '),

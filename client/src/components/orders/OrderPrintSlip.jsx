@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { Download, FileText, ExternalLink, X, Printer } from 'lucide-react';
 import { formatDate } from '../../utils/dateUtils';
-import { SHIRT_FIELDS, PANT_FIELDS } from '../../utils/measurementLabels';
+import { SHIRT_FIELDS, PANT_FIELDS, getFieldValue } from '../../utils/measurementLabels';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useTenantMeasurements } from '../../hooks/useTenantMeasurements';
 import { downloadOrderSlipPdf, getOrderSlipPdfBlobUrl } from '../../services/orderSlipPdfService';
 
 export const OrderPrintSlip = ({ order, onClose }) => {
   const { user } = useAuth();
   const { success, error: toastError } = useToast();
   const [generating, setGenerating] = useState(false);
+  const { shirtDefinitions, pantDefinitions } = useTenantMeasurements();
 
   if (!order) return null;
 
@@ -43,6 +45,45 @@ export const OrderPrintSlip = ({ order, onClose }) => {
     ...(Array.isArray(order.pant?.patterns) ? order.pant.patterns : (order.pant?.pattern ? [order.pant.pattern] : [])),
     order.pant?.customPattern
   ].filter(Boolean).join(', ') || 'Standard / None';
+
+  // Helper to dynamically build garment fields from snapshot, tenant defs, or measurements
+  const resolveGarmentFields = (category, garment, snapshotList, tenantDefs = []) => {
+    const measurements = garment?.measurements || {};
+
+    if (Array.isArray(snapshotList) && snapshotList.length > 0) {
+      return snapshotList.map(s => ({
+        key: s.fieldKey,
+        label: s.gujaratiName ? `${s.displayName} (${s.gujaratiName})` : s.displayName,
+        value: getFieldValue(measurements, s.fieldKey) || s.value,
+      }));
+    }
+
+    const baseDefs = Array.isArray(tenantDefs) && tenantDefs.length > 0
+      ? tenantDefs
+      : (category === 'shirt' ? SHIRT_FIELDS : PANT_FIELDS);
+
+    const fields = baseDefs.map(d => ({
+      key: d.fieldKey || d.key,
+      label: d.gujaratiName ? `${d.displayName || d.label} (${d.gujaratiName})` : (d.displayName || d.label),
+      value: getFieldValue(measurements, d.fieldKey || d.key),
+    }));
+
+    const existingKeys = new Set(fields.map(f => f.key));
+    Object.keys(measurements).forEach(k => {
+      if (k !== 'notes' && !existingKeys.has(k) && measurements[k] !== undefined && measurements[k] !== '') {
+        fields.push({
+          key: k,
+          label: k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          value: measurements[k],
+        });
+      }
+    });
+
+    return fields;
+  };
+
+  const shirtFieldsToDisplay = resolveGarmentFields('shirt', order.shirt, order.measurementSnapshot?.shirt, shirtDefinitions);
+  const pantFieldsToDisplay = resolveGarmentFields('pant', order.pant, order.measurementSnapshot?.pant, pantDefinitions);
 
   return (
     <div
@@ -209,10 +250,12 @@ export const OrderPrintSlip = ({ order, onClose }) => {
                 </span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
-                {SHIRT_FIELDS.map((f) => (
+                {shirtFieldsToDisplay.map((f) => (
                   <div key={f.key} style={{ border: '1px solid #e2e8f0', padding: '6px 8px', borderRadius: '6px', fontSize: '0.85rem' }}>
                     <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{f.label}</div>
-                    <div style={{ fontWeight: 700 }}>{order.shirt?.measurements?.[f.key] || '-'}</div>
+                    <div style={{ fontWeight: 700 }}>
+                      {f.value !== undefined && f.value !== '' ? f.value : '-'}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -234,10 +277,12 @@ export const OrderPrintSlip = ({ order, onClose }) => {
                 </span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
-                {PANT_FIELDS.map((f) => (
+                {pantFieldsToDisplay.map((f) => (
                   <div key={f.key} style={{ border: '1px solid #e2e8f0', padding: '6px 8px', borderRadius: '6px', fontSize: '0.85rem' }}>
                     <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{f.label}</div>
-                    <div style={{ fontWeight: 700 }}>{order.pant?.measurements?.[f.key] || '-'}</div>
+                    <div style={{ fontWeight: 700 }}>
+                      {f.value !== undefined && f.value !== '' ? f.value : '-'}
+                    </div>
                   </div>
                 ))}
               </div>

@@ -24,8 +24,9 @@ import { useToast } from '../context/ToastContext';
 import { OrderPrintSlip } from '../components/orders/OrderPrintSlip';
 import { Loading } from '../components/common/Loading';
 import { ErrorMessage } from '../components/common/ErrorMessage';
-import { REQUIRED_SHIRT_FIELDS, REQUIRED_PANT_FIELDS } from '../utils/measurementLabels';
+import { REQUIRED_SHIRT_FIELDS, REQUIRED_PANT_FIELDS, getFieldValue } from '../utils/measurementLabels';
 import { formatDate } from '../utils/dateUtils';
+import { useTenantMeasurements } from '../hooks/useTenantMeasurements';
 
 // Helper to determine whether a customer has saved measurements in their profile
 export const checkHasCustomerMeasurements = (customer) => {
@@ -55,6 +56,9 @@ export const CreateOrderPage = ({ isEdit: isEditProp }) => {
   const [orderLoading, setOrderLoading] = useState(isEditing);
   const [orderLoadError, setOrderLoadError] = useState('');
   const [originalOrder, setOriginalOrder] = useState(null);
+
+  // Tenant dynamic measurement definitions
+  const { shirtDefinitions, pantDefinitions } = useTenantMeasurements();
 
   // Customer Mode: 'existing' | 'new'
   const [customerMode, setCustomerMode] = useState('existing');
@@ -140,7 +144,15 @@ export const CreateOrderPage = ({ isEdit: isEditProp }) => {
           : (ord.shirt?.pattern ? ord.shirt.pattern.split(',').map((p) => p.trim()).filter(Boolean) : []);
         setShirtPatterns(sPatterns);
         setShirtCustomPattern(ord.shirt?.customPattern || '');
-        setShirtMeasurements(ord.shirt?.measurements ? { ...ord.shirt.measurements } : {});
+        const sMeasurements = { ...(ord.shirt?.measurements || {}) };
+        if (Array.isArray(ord.measurementSnapshot?.shirt)) {
+          ord.measurementSnapshot.shirt.forEach((item) => {
+            if (item.fieldKey && sMeasurements[item.fieldKey] === undefined && item.value !== undefined) {
+              sMeasurements[item.fieldKey] = item.value;
+            }
+          });
+        }
+        setShirtMeasurements(sMeasurements);
 
         // Populate pant specifications from order snapshot
         setPantQuantity(ord.pant?.quantity ?? 0);
@@ -149,7 +161,16 @@ export const CreateOrderPage = ({ isEdit: isEditProp }) => {
           : (ord.pant?.pattern ? ord.pant.pattern.split(',').map((p) => p.trim()).filter(Boolean) : []);
         setPantPatterns(pPatterns);
         setPantCustomPattern(ord.pant?.customPattern || '');
-        setPantMeasurements(ord.pant?.measurements ? { ...ord.pant.measurements } : {});
+
+        const pMeasurements = { ...(ord.pant?.measurements || {}) };
+        if (Array.isArray(ord.measurementSnapshot?.pant)) {
+          ord.measurementSnapshot.pant.forEach((item) => {
+            if (item.fieldKey && pMeasurements[item.fieldKey] === undefined && item.value !== undefined) {
+              pMeasurements[item.fieldKey] = item.value;
+            }
+          });
+        }
+        setPantMeasurements(pMeasurements);
 
         // Set customer
         if (ord.customer) {
@@ -373,9 +394,9 @@ export const CreateOrderPage = ({ isEdit: isEditProp }) => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
-      const digitsOnly = newCustomer.mobileNumber.replace(/\D/g, '');
-      if (!newCustomer.mobileNumber.trim() || digitsOnly.length !== 10) {
-        setValidationError('Please enter a valid 10-digit mobile number.');
+      const rawMobile = (newCustomer.mobileNumber || '').trim();
+      if (!rawMobile || !/^\d{10}$/.test(rawMobile)) {
+        setValidationError('Mobile number must be exactly 10 digits.');
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
@@ -402,39 +423,83 @@ export const CreateOrderPage = ({ isEdit: isEditProp }) => {
       return;
     }
 
-    // 4. Quantity-based Measurement Validations
+    // 4. Quantity-based Dynamic Measurement Validations
     const newShirtErrors = {};
     const newPantErrors = {};
 
     if (sQty > 0) {
-      for (const field of REQUIRED_SHIRT_FIELDS) {
-        const val = shirtMeasurements[field];
-        if (val === undefined || val === null || String(val).trim() === '') {
-          newShirtErrors[field] = 'Required';
+      if (shirtDefinitions && shirtDefinitions.length > 0) {
+        for (const def of shirtDefinitions) {
+          if (def.isActive && def.isRequired) {
+            const val = getFieldValue(shirtMeasurements, def.fieldKey);
+            if (val === undefined || val === null || String(val).trim() === '') {
+              newShirtErrors[def.fieldKey] = 'Required';
+            }
+          }
         }
-      }
-      for (const [key, val] of Object.entries(shirtMeasurements)) {
-        if (key !== 'notes' && val !== undefined && val !== null && String(val).trim() !== '') {
-          const num = parseFloat(val);
-          if (isNaN(num) || num <= 0) {
-            newShirtErrors[key] = 'Must be > 0';
+        for (const [key, val] of Object.entries(shirtMeasurements)) {
+          if (key !== 'notes' && key !== '_id' && !key.startsWith('$') && !key.startsWith('_') && val !== undefined && val !== null && String(val).trim() !== '') {
+            const def = shirtDefinitions.find((d) => d.fieldKey === key);
+            if (!def || def.fieldType === 'number') {
+              const num = parseFloat(val);
+              if (isNaN(num) || num <= 0) {
+                newShirtErrors[key] = 'Must be > 0';
+              }
+            }
+          }
+        }
+      } else {
+        for (const field of REQUIRED_SHIRT_FIELDS) {
+          const val = getFieldValue(shirtMeasurements, field);
+          if (val === undefined || val === null || String(val).trim() === '') {
+            newShirtErrors[field] = 'Required';
+          }
+        }
+        for (const [key, val] of Object.entries(shirtMeasurements)) {
+          if (key !== 'notes' && !key.startsWith('$') && !key.startsWith('_') && val !== undefined && val !== null && String(val).trim() !== '') {
+            const num = parseFloat(val);
+            if (isNaN(num) || num <= 0) {
+              newShirtErrors[key] = 'Must be > 0';
+            }
           }
         }
       }
     }
 
     if (pQty > 0) {
-      for (const field of REQUIRED_PANT_FIELDS) {
-        const val = pantMeasurements[field];
-        if (val === undefined || val === null || String(val).trim() === '') {
-          newPantErrors[field] = 'Required';
+      if (pantDefinitions && pantDefinitions.length > 0) {
+        for (const def of pantDefinitions) {
+          if (def.isActive && def.isRequired) {
+            const val = getFieldValue(pantMeasurements, def.fieldKey);
+            if (val === undefined || val === null || String(val).trim() === '') {
+              newPantErrors[def.fieldKey] = 'Required';
+            }
+          }
         }
-      }
-      for (const [key, val] of Object.entries(pantMeasurements)) {
-        if (key !== 'notes' && val !== undefined && val !== null && String(val).trim() !== '') {
-          const num = parseFloat(val);
-          if (isNaN(num) || num <= 0) {
-            newPantErrors[key] = 'Must be > 0';
+        for (const [key, val] of Object.entries(pantMeasurements)) {
+          if (key !== 'notes' && key !== '_id' && !key.startsWith('$') && !key.startsWith('_') && val !== undefined && val !== null && String(val).trim() !== '') {
+            const def = pantDefinitions.find((d) => d.fieldKey === key);
+            if (!def || def.fieldType === 'number') {
+              const num = parseFloat(val);
+              if (isNaN(num) || num <= 0) {
+                newPantErrors[key] = 'Must be > 0';
+              }
+            }
+          }
+        }
+      } else {
+        for (const field of REQUIRED_PANT_FIELDS) {
+          const val = getFieldValue(pantMeasurements, field);
+          if (val === undefined || val === null || String(val).trim() === '') {
+            newPantErrors[field] = 'Required';
+          }
+        }
+        for (const [key, val] of Object.entries(pantMeasurements)) {
+          if (key !== 'notes' && !key.startsWith('$') && !key.startsWith('_') && val !== undefined && val !== null && String(val).trim() !== '') {
+            const num = parseFloat(val);
+            if (isNaN(num) || num <= 0) {
+              newPantErrors[key] = 'Must be > 0';
+            }
           }
         }
       }
@@ -469,7 +534,6 @@ export const CreateOrderPage = ({ isEdit: isEditProp }) => {
           orderDate,
           deadline,
           deliveryTime,
-          measurementUnit: 'inch',
           shirt: {
             quantity: sQty,
             patterns: sQty > 0 ? shirtPatterns : [],
@@ -932,10 +996,15 @@ export const CreateOrderPage = ({ isEdit: isEditProp }) => {
                 </label>
                 <input
                   type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
                   className="form-control"
-                  placeholder="e.g. 9876543210"
+                  placeholder="e.g. 9876543210 (10 digits)"
                   value={newCustomer.mobileNumber}
-                  onChange={(e) => setNewCustomer({ ...newCustomer, mobileNumber: e.target.value })}
+                  onChange={(e) => {
+                    const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setNewCustomer({ ...newCustomer, mobileNumber: digitsOnly });
+                  }}
                   required
                 />
               </div>
@@ -977,6 +1046,7 @@ export const CreateOrderPage = ({ isEdit: isEditProp }) => {
           onChangeQuantity={handleShirtQuantityChange}
           errors={shirtErrors}
           onClearError={handleClearShirtError}
+          definitions={shirtDefinitions}
         />
 
         {/* SECTION 3: Pant Specifications & Measurements */}
@@ -991,6 +1061,7 @@ export const CreateOrderPage = ({ isEdit: isEditProp }) => {
           onChangeQuantity={handlePantQuantityChange}
           errors={pantErrors}
           onClearError={handleClearPantError}
+          definitions={pantDefinitions}
         />
 
         {/* SECTION 4: Order Schedule & Instructions */}

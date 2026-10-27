@@ -4,29 +4,47 @@ import { AlertTriangle, X } from 'lucide-react';
 export const ConfirmDialog = ({
   isOpen,
   onClose,
+  onCancel,
   onConfirm,
   title = 'Confirm Action',
   message = 'Are you sure you want to proceed?',
   confirmText = 'Delete',
   cancelText = 'Cancel',
   danger = true,
+  confirmVariant,
   loading = false,
   error = '',
 }) => {
+  const handleClose = () => {
+    if (loading) return;
+    if (typeof onClose === 'function') {
+      onClose();
+    } else if (typeof onCancel === 'function') {
+      onCancel();
+    }
+  };
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && isOpen && !loading) {
-        onClose();
+        handleClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, loading, onClose]);
+  }, [isOpen, loading, onClose, onCancel]);
 
   if (!isOpen) return null;
 
+  const isDanger = confirmVariant === 'danger' || (danger && confirmVariant !== 'warning');
+
   return (
     <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !loading) {
+          handleClose();
+        }
+      }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -104,13 +122,15 @@ export const ConfirmDialog = ({
           </div>
 
           <button
-            onClick={onClose}
+            type="button"
+            onClick={handleClose}
             disabled={loading}
+            aria-label="Close dialog"
             style={{
               background: 'none',
               border: 'none',
               color: 'var(--text-muted)',
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
               padding: '4px',
             }}
           >
@@ -129,7 +149,7 @@ export const ConfirmDialog = ({
         >
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             disabled={loading}
             className="btn btn-outline btn-sm"
           >
@@ -139,7 +159,7 @@ export const ConfirmDialog = ({
             type="button"
             onClick={onConfirm}
             disabled={loading}
-            className={`btn ${danger ? 'btn-danger' : 'btn-primary'} btn-sm`}
+            className={`btn ${isDanger ? 'btn-danger' : (confirmVariant === 'warning' ? 'btn-gold' : 'btn-primary')} btn-sm`}
             style={{ minWidth: '90px' }}
           >
             {loading ? 'Processing...' : confirmText}

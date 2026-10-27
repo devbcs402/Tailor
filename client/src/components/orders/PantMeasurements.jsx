@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Layers, CheckSquare, Square } from 'lucide-react';
-import { PANT_FIELDS } from '../../utils/measurementLabels';
-import { patternsApi } from '../../api/patternsApi';
+import React from 'react';
+import { Layers, CheckSquare, Square, History } from 'lucide-react';
+import { useTenantMeasurements } from '../../hooks/useTenantMeasurements';
+import { useTenantPatterns } from '../../hooks/useTenantPatterns';
+import { getFieldValue, normalizeKey, TAILOR_ALIASES } from '../../utils/measurementLabels';
 
 export const PantMeasurements = ({
   measurements = {},
@@ -14,38 +15,14 @@ export const PantMeasurements = ({
   onChangeQuantity,
   errors = {},
   onClearError,
+  definitions: propDefinitions,
 }) => {
-  const [availablePatterns, setAvailablePatterns] = useState([]);
-  const [loadingPatterns, setLoadingPatterns] = useState(false);
+  // Use pattern hook for real-time synchronized pattern definitions
+  const { patternNames: availablePatterns, loading: loadingPatterns } = useTenantPatterns('pant');
 
-  // Fetch active pant patterns configured in Settings
-  useEffect(() => {
-    let isMounted = true;
-    const fetchPantPatterns = async () => {
-      try {
-        setLoadingPatterns(true);
-        const res = await patternsApi.getPatterns({ type: 'pant' });
-        if (isMounted) {
-          if (res.data && Array.isArray(res.data)) {
-            setAvailablePatterns(res.data.map((p) => p.name));
-          } else {
-            setAvailablePatterns([]);
-          }
-        }
-      } catch (err) {
-        if (isMounted) {
-          setAvailablePatterns([]);
-        }
-      } finally {
-        if (isMounted) setLoadingPatterns(false);
-      }
-    };
-
-    fetchPantPatterns();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  // Use hook to fetch tenant's definitions if not provided by parent
+  const { pantDefinitions: hookDefinitions, loading: loadingDefs } = useTenantMeasurements();
+  const baseDefinitions = propDefinitions || hookDefinitions || [];
 
   const numQty = parseInt(quantity, 10);
   const isAvailable = !isNaN(numQty) && numQty > 0;
@@ -54,7 +31,6 @@ export const PantMeasurements = ({
     const val = e.target.value;
     const parsed = parseInt(val, 10);
     onChangeQuantity(val);
-    // If quantity is set to 0 or becomes empty, clear dependent measurements
     if (isNaN(parsed) || parsed <= 0) {
       onChangeMeasurements({});
     }
@@ -72,25 +48,61 @@ export const PantMeasurements = ({
     onChangeSelectedPatterns(updated);
   };
 
-  const handleFieldChange = (key, value) => {
+  const isCoveredByDefinitions = (key, defs) => {
+    const norm = normalizeKey(key);
+    for (const d of defs) {
+      if (d.fieldKey === key || normalizeKey(d.fieldKey) === norm) return true;
+      const aliases = TAILOR_ALIASES[normalizeKey(d.fieldKey)];
+      if (aliases && aliases.map(normalizeKey).includes(norm)) return true;
+    }
+    return false;
+  };
+
+  const handleFieldChange = (key, value, fieldType = 'number') => {
     if (!isAvailable) return;
     if (onClearError) {
       onClearError(key);
     }
-    if (key === 'notes') {
-      onChangeMeasurements({
-        ...measurements,
-        [key]: value,
-      });
-    } else {
-      // Validate: only positive numeric values with optional decimal, reject letters and negatives
-      const clean = value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1');
-      onChangeMeasurements({
-        ...measurements,
-        [key]: clean,
-      });
-    }
+    const clean = (key === 'notes' || fieldType === 'text')
+      ? value
+      : value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1');
+
+    const updated = { ...measurements, [key]: clean };
+    // Clean up any other case/alias variants to prevent stale duplicates
+    const normKey = normalizeKey(key);
+    Object.keys(measurements).forEach((oldK) => {
+      if (oldK !== key && normalizeKey(oldK) === normKey) {
+        delete updated[oldK];
+      }
+    });
+
+    onChangeMeasurements(updated);
   };
+
+  // Identify any saved measurements that are NOT in current active definitions (historical/deactivated fields)
+  // Ensures historical orders never lose or hide previously entered custom measurements
+  const historicalFields = Object.keys(measurements)
+    .filter(
+      (k) =>
+        k !== 'notes' &&
+        k !== '_id' &&
+        !k.startsWith('$') &&
+        !k.startsWith('_') &&
+        !isCoveredByDefinitions(k, baseDefinitions) &&
+        measurements[k] !== undefined &&
+        measurements[k] !== null &&
+        String(measurements[k]).trim().length > 0
+    )
+    .map((k) => ({
+      fieldKey: k,
+      displayName: k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+      gujaratiName: '',
+      fieldType: 'number',
+      isRequired: false,
+      isHistorical: true,
+    }));
+
+  const allFieldsToRender = [...baseDefinitions, ...historicalFields];
 
   return (
     <div className="card" style={{ borderTop: '4px solid var(--secondary)', opacity: isAvailable ? 1 : 0.88 }}>
@@ -156,44 +168,45 @@ export const PantMeasurements = ({
         >
           {availablePatterns.length === 0 && !loadingPatterns ? (
             <div style={{ padding: '8px', fontSize: '0.86rem', color: 'var(--text-muted)' }}>
-              No pant patterns configured. You can enter a custom pattern below or manage patterns in Pattern Settings.
+              No pant patterns configured. You can enter a custom pattern below or configure patterns in Measurement Settings.
             </div>
           ) : (
             availablePatterns.map((pat) => {
-            const isChecked = selectedPatterns.includes(pat);
-            return (
-              <label
-                key={pat}
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (isAvailable) handleTogglePattern(pat);
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  backgroundColor: isChecked && isAvailable ? 'var(--secondary)' : '#ffffff',
-                  color: isChecked && isAvailable ? '#ffffff' : isAvailable ? 'var(--text-main)' : '#94a3b8',
-                  border: isChecked && isAvailable ? '1px solid var(--secondary)' : '1px solid var(--border-light)',
-                  cursor: isAvailable ? 'pointer' : 'not-allowed',
-                  fontSize: '0.9rem',
-                  fontWeight: isChecked ? 700 : 500,
-                  transition: 'all 0.15s ease',
-                  userSelect: 'none',
-                  opacity: isAvailable ? 1 : 0.65,
-                }}
-              >
-                {isChecked && isAvailable ? (
-                  <CheckSquare size={16} color="var(--accent-gold)" />
-                ) : (
-                  <Square size={16} color={isAvailable ? 'var(--text-muted)' : '#cbd5e1'} />
-                )}
-                <span>{pat}</span>
-              </label>
-            );
-          }))}
+              const isChecked = selectedPatterns.includes(pat);
+              return (
+                <label
+                  key={pat}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (isAvailable) handleTogglePattern(pat);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    backgroundColor: isChecked && isAvailable ? 'var(--secondary)' : '#ffffff',
+                    color: isChecked && isAvailable ? '#ffffff' : isAvailable ? 'var(--text-main)' : '#94a3b8',
+                    border: isChecked && isAvailable ? '1px solid var(--secondary)' : '1px solid var(--border-light)',
+                    cursor: isAvailable ? 'pointer' : 'not-allowed',
+                    fontSize: '0.9rem',
+                    fontWeight: isChecked ? 700 : 500,
+                    transition: 'all 0.15s ease',
+                    userSelect: 'none',
+                    opacity: isAvailable ? 1 : 0.65,
+                  }}
+                >
+                  {isChecked && isAvailable ? (
+                    <CheckSquare size={16} color="var(--accent-gold)" />
+                  ) : (
+                    <Square size={16} color={isAvailable ? 'var(--text-muted)' : '#cbd5e1'} />
+                  )}
+                  <span>{pat}</span>
+                </label>
+              );
+            })
+          )}
         </div>
 
         {/* Additional Custom Pant Pattern */}
@@ -213,7 +226,7 @@ export const PantMeasurements = ({
         </div>
       </div>
 
-      {/* Measurement Fields Grid (Disabled/empty when Qty is 0) */}
+      {/* Dynamic Measurement Fields Grid */}
       <div
         style={{
           display: 'grid',
@@ -221,37 +234,50 @@ export const PantMeasurements = ({
           gap: '12px',
         }}
       >
-        {PANT_FIELDS.map((f) => {
-          const hasError = Boolean(errors && errors[f.key]);
+        {allFieldsToRender.map((f) => {
+          const hasError = Boolean(errors && errors[f.fieldKey]);
+          const fieldType = f.fieldType || 'number';
+
           return (
             <div
-              key={f.key}
+              key={f.fieldKey}
               className="measure-input-card"
               style={{
                 backgroundColor: isAvailable ? '#ffffff' : '#f8fafc',
                 borderColor: hasError ? '#dc2626' : (isAvailable ? 'var(--border-light)' : '#e2e8f0'),
                 borderWidth: hasError ? '1.5px' : '1px',
                 opacity: isAvailable ? 1 : 0.7,
+                position: 'relative',
               }}
             >
               <div className="measure-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: hasError ? '#dc2626' : (isAvailable ? '#475569' : '#94a3b8'), fontWeight: 600 }}>
-                  {f.label}{' '}
-                  {f.gujaratiLabel && (
-                    <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
-                      ({f.gujaratiLabel})
+                <span style={{ color: hasError ? '#dc2626' : (isAvailable ? '#475569' : '#94a3b8'), fontWeight: 600, fontSize: '0.84rem' }}>
+                  {f.displayName}{' '}
+                  {f.gujaratiName && (
+                    <span style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 500 }}>
+                      ({f.gujaratiName})
                     </span>
-                  )}{' '}
-                  {f.required && isAvailable && <span style={{ color: '#dc2626', fontWeight: 800 }}>*</span>}
+                  )}
+                  {f.isRequired && isAvailable && <span style={{ color: '#dc2626', fontWeight: 800 }}> *</span>}
                 </span>
+
+                {f.isHistorical && (
+                  <span
+                    title="Historical field preserved from previous order or profile"
+                    style={{ fontSize: '0.68rem', padding: '1px 4px', backgroundColor: '#fef3c7', color: '#92400e', borderRadius: '4px' }}
+                  >
+                    Historical
+                  </span>
+                )}
               </div>
+
               <input
                 type="text"
-                inputMode="decimal"
+                inputMode={fieldType === 'number' ? 'decimal' : 'text'}
                 className="form-control"
-                placeholder={isAvailable ? f.placeholder : '—'}
-                value={isAvailable ? (measurements[f.key] || '') : ''}
-                onChange={(e) => handleFieldChange(f.key, e.target.value)}
+                placeholder={isAvailable ? (fieldType === 'number' ? 'e.g. 38' : 'Value') : '—'}
+                value={isAvailable ? getFieldValue(measurements, f.fieldKey) : ''}
+                onChange={(e) => handleFieldChange(f.fieldKey, e.target.value, fieldType)}
                 disabled={!isAvailable}
                 style={{
                   fontWeight: 600,
@@ -264,7 +290,7 @@ export const PantMeasurements = ({
               />
               {hasError && (
                 <span style={{ color: '#dc2626', fontSize: '0.73rem', marginTop: '4px', display: 'block', fontWeight: 600 }}>
-                  {errors[f.key]}
+                  {errors[f.fieldKey]}
                 </span>
               )}
             </div>
@@ -282,7 +308,7 @@ export const PantMeasurements = ({
           className="form-control"
           placeholder={isAvailable ? 'e.g. Cross pockets, one back pocket, coin pocket, belt loop count...' : 'Disabled (Qty is 0)'}
           value={isAvailable ? (measurements.notes || '') : ''}
-          onChange={(e) => handleFieldChange('notes', e.target.value)}
+          onChange={(e) => handleFieldChange('notes', e.target.value, 'text')}
           disabled={!isAvailable}
           style={{ backgroundColor: isAvailable ? '#ffffff' : '#f8fafc', cursor: isAvailable ? 'text' : 'not-allowed' }}
         />

@@ -1,8 +1,8 @@
 import React from 'react';
-import { SHIRT_FIELDS, PANT_FIELDS } from '../../utils/measurementLabels';
 import { getShirtPatternLabel, getPantPatternLabel } from '../../utils/patternOptions';
 import { formatDate } from '../../utils/dateUtils';
-import { Ruler } from 'lucide-react';
+import { useTenantMeasurements } from '../../hooks/useTenantMeasurements';
+import { getFieldValue, normalizeKey, TAILOR_ALIASES } from '../../utils/measurementLabels';
 
 export const MeasurementDisplay = ({
   measurements,
@@ -13,24 +13,56 @@ export const MeasurementDisplay = ({
   pantCustomPattern = '',
   pantPatterns = [],
   updatedAt,
+  shirtDefinitions: propShirtDefs,
+  pantDefinitions: propPantDefs,
 }) => {
   const shirt = measurements?.shirt || {};
   const pant = measurements?.pant || {};
 
+  const { shirtDefinitions: hookShirtDefs, pantDefinitions: hookPantDefs } = useTenantMeasurements();
+  const baseShirtDefs = propShirtDefs || hookShirtDefs || [];
+  const basePantDefs = propPantDefs || hookPantDefs || [];
+
+  const isCoveredByDefinitions = (key, defs) => {
+    const norm = normalizeKey(key);
+    for (const d of defs) {
+      if (d.fieldKey === key || normalizeKey(d.fieldKey) === norm) return true;
+      const aliases = TAILOR_ALIASES[normalizeKey(d.fieldKey)];
+      if (aliases && aliases.map(normalizeKey).includes(norm)) return true;
+    }
+    return false;
+  };
+
+  // Combine definitions with any extra keys present in the saved customer measurement object
+  const extraShirtFields = Object.keys(shirt)
+    .filter((k) => k !== 'notes' && k !== '_id' && !k.startsWith('$') && !k.startsWith('_') && !isCoveredByDefinitions(k, baseShirtDefs) && shirt[k] !== undefined && shirt[k] !== null && String(shirt[k]).trim().length > 0)
+    .map((k) => ({
+      fieldKey: k,
+      displayName: k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+      gujaratiName: '',
+    }));
+  const displayShirtFields = [...baseShirtDefs, ...extraShirtFields];
+
+  const extraPantFields = Object.keys(pant)
+    .filter((k) => k !== 'notes' && k !== '_id' && !k.startsWith('$') && !k.startsWith('_') && !isCoveredByDefinitions(k, basePantDefs) && pant[k] !== undefined && pant[k] !== null && String(pant[k]).trim().length > 0)
+    .map((k) => ({
+      fieldKey: k,
+      displayName: k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+      gujaratiName: '',
+    }));
+  const displayPantFields = [...basePantDefs, ...extraPantFields];
+
   const shirtPatDisplay = [
     ...(Array.isArray(shirtPatterns) && shirtPatterns.length ? shirtPatterns : []),
     shirtPattern && shirtPattern !== 'plain' ? getShirtPatternLabel(shirtPattern, '') : null,
-    shirtCustomPattern
+    shirtCustomPattern,
   ].filter(Boolean).join(', ') || 'None specified';
 
   const pantPatDisplay = [
     ...(Array.isArray(pantPatterns) && pantPatterns.length ? pantPatterns : []),
     pantPattern && pantPattern !== 'plain_pant' ? getPantPatternLabel(pantPattern, '') : null,
-    pantCustomPattern
+    pantCustomPattern,
   ].filter(Boolean).join(', ') || 'None specified';
-
-  const hasShirtMeasurements = Object.values(shirt).some((v) => v && String(v).trim().length > 0);
-  const hasPantMeasurements = Object.values(pant).some((v) => v && String(v).trim().length > 0);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -81,11 +113,11 @@ export const MeasurementDisplay = ({
               gap: '10px',
             }}
           >
-            {SHIRT_FIELDS.map((f) => {
-              const val = shirt[f.key];
+            {displayShirtFields.map((f) => {
+              const val = getFieldValue(shirt, f.fieldKey);
               return (
                 <div
-                  key={f.key}
+                  key={f.fieldKey}
                   style={{
                     padding: '8px 10px',
                     borderRadius: '8px',
@@ -93,7 +125,9 @@ export const MeasurementDisplay = ({
                     border: '1px solid var(--border-light)',
                   }}
                 >
-                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>{f.label}</div>
+                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    {f.displayName} {f.gujaratiName ? `(${f.gujaratiName})` : ''}
+                  </div>
                   <div style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
                     {val || '-'}
                   </div>
@@ -136,11 +170,11 @@ export const MeasurementDisplay = ({
               gap: '10px',
             }}
           >
-            {PANT_FIELDS.map((f) => {
-              const val = pant[f.key];
+            {displayPantFields.map((f) => {
+              const val = getFieldValue(pant, f.fieldKey);
               return (
                 <div
-                  key={f.key}
+                  key={f.fieldKey}
                   style={{
                     padding: '8px 10px',
                     borderRadius: '8px',
@@ -148,7 +182,9 @@ export const MeasurementDisplay = ({
                     border: '1px solid var(--border-light)',
                   }}
                 >
-                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>{f.label}</div>
+                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    {f.displayName} {f.gujaratiName ? `(${f.gujaratiName})` : ''}
+                  </div>
                   <div style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
                     {val || '-'}
                   </div>

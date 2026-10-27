@@ -4,6 +4,7 @@ import { User } from '../models/User.js';
 import { Customer } from '../models/Customer.js';
 import { Order } from '../models/Order.js';
 import { Pattern } from '../models/Pattern.js';
+import { MeasurementDefinition, seedTenantDefaultMeasurements } from '../models/MeasurementDefinition.js';
 import { OrderCounter } from '../models/OrderCounter.js';
 import { AuditLog } from '../models/AuditLog.js';
 import { seedTenantDefaultPatterns } from './patternController.js';
@@ -299,8 +300,9 @@ export const createTenant = async (req, res, next) => {
 
     await adminUser.save();
 
-    // 3. Seed starter patterns for this tenant
+    // 3. Seed starter patterns and default measurements for this tenant
     await seedTenantDefaultPatterns(tenant._id);
+    await seedTenantDefaultMeasurements(tenant._id);
 
     // 4. Record Audit Log
     try {
@@ -677,6 +679,9 @@ export const deleteTenant = async (req, res, next) => {
         const patternResult = await Pattern.deleteMany({ tenantId: tenant._id }).session(session);
         deletedPatternsCount = patternResult.deletedCount;
 
+        // 3b. Delete Measurement Definitions belonging strictly to this tenant
+        await MeasurementDefinition.deleteMany({ tenantId: tenant._id }).session(session);
+
         // 4. Delete OrderCounters for this tenant
         const counterResult = await OrderCounter.deleteMany({
           name: new RegExp(`^order_seq_${tenant._id}_`),
@@ -715,6 +720,8 @@ export const deleteTenant = async (req, res, next) => {
 
       const patternResult = await Pattern.deleteMany({ tenantId: tenant._id });
       deletedPatternsCount = patternResult.deletedCount;
+
+      await MeasurementDefinition.deleteMany({ tenantId: tenant._id });
 
       const counterResult = await OrderCounter.deleteMany({
         name: new RegExp(`^order_seq_${tenant._id}_`),

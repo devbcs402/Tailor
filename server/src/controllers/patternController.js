@@ -52,15 +52,22 @@ export const seedTenantDefaultPatterns = async (tenantId) => {
 export const getPatterns = async (req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
-    const { type, search = '', all = false } = req.query;
+    const { type, category, search = '', all = false } = req.query;
 
     const query = { tenantId };
     if (!all) {
       query.isActive = true;
     }
 
-    if (type && ['shirt', 'pant'].includes(type.toLowerCase())) {
-      query.type = type.toLowerCase();
+    let resolvedType = type;
+    if (category) {
+      if (category === 'shirt_pattern') resolvedType = 'shirt';
+      else if (category === 'pant_pattern') resolvedType = 'pant';
+      else resolvedType = category.replace('_pattern', '');
+    }
+
+    if (resolvedType && ['shirt', 'pant'].includes(resolvedType.toLowerCase())) {
+      query.type = resolvedType.toLowerCase();
     }
 
     if (search.trim()) {
@@ -84,24 +91,32 @@ export const getPatterns = async (req, res, next) => {
 export const createPattern = async (req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
-    const { name, type } = req.body;
+    let { name, patternName, type, category } = req.body;
 
-    if (!name || !name.trim()) {
+    const finalName = (patternName !== undefined ? patternName : name) || '';
+    let resolvedType = type;
+    if (category) {
+      if (category === 'shirt_pattern') resolvedType = 'shirt';
+      else if (category === 'pant_pattern') resolvedType = 'pant';
+      else resolvedType = category.replace('_pattern', '');
+    }
+
+    if (!finalName || !finalName.trim()) {
       return res.status(400).json({
         success: false,
         message: 'Pattern name is required',
       });
     }
 
-    if (!type || !['shirt', 'pant'].includes(type.toLowerCase())) {
+    if (!resolvedType || !['shirt', 'pant'].includes(resolvedType.toLowerCase())) {
       return res.status(400).json({
         success: false,
-        message: 'Pattern type must be either "shirt" or "pant"',
+        message: 'Pattern type must be either "shirt" or "pant" (or category "shirt_pattern" or "pant_pattern")',
       });
     }
 
-    const trimmedName = name.trim();
-    const patternType = type.toLowerCase();
+    const trimmedName = finalName.trim();
+    const patternType = resolvedType.toLowerCase();
 
     // Check for case-insensitive duplicate within the same tenant & type
     const duplicate = await Pattern.findOne({
@@ -240,3 +255,39 @@ export const deletePattern = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Toggle pattern active status
+ */
+export const togglePatternStatus = async (req, res, next) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { id } = req.params;
+    const { isActive } = req.body;
+
+    const pattern = await Pattern.findOne({ _id: id, tenantId });
+    if (!pattern) {
+      return res.status(404).json({
+        success: false,
+        message: 'Pattern not found',
+      });
+    }
+
+    if (isActive !== undefined) {
+      pattern.isActive = Boolean(isActive);
+    } else {
+      pattern.isActive = !pattern.isActive;
+    }
+
+    await pattern.save();
+
+    return res.json({
+      success: true,
+      message: `Pattern "${pattern.name}" status updated`,
+      data: pattern,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

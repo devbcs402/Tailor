@@ -9,6 +9,7 @@ import {
   LogOut,
   Scissors,
   X,
+  Ruler,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -39,6 +40,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
     { to: '/orders/create', label: 'Create Order', icon: PlusCircle },
     { to: '/orders', label: 'All Orders', icon: ClipboardList },
     { to: '/customers', label: 'Customers', icon: Users },
+    { to: '/settings/measurements', label: 'Measurement Settings', icon: Ruler },
     { to: '/settings', label: 'Settings', icon: Settings },
   ];
 
@@ -170,8 +172,10 @@ export const Sidebar = ({ isOpen, onClose }) => {
                 ? currentPath === '/orders' || (currentPath.startsWith('/orders/') && currentPath !== '/orders/create')
                 : item.to === '/customers'
                 ? currentPath === '/customers' || currentPath.startsWith('/customers/')
+                : item.to === '/settings/measurements'
+                ? currentPath === '/settings/measurements'
                 : item.to === '/settings'
-                ? currentPath === '/settings' || currentPath.startsWith('/settings/')
+                ? currentPath === '/settings' || (currentPath.startsWith('/settings/') && currentPath !== '/settings/measurements')
                 : currentPath === item.to;
 
             return (

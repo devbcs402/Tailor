@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { SHIRT_FIELDS, PANT_FIELDS } from '../utils/measurementLabels.js';
+import { SHIRT_FIELDS, PANT_FIELDS, getFieldValue } from '../utils/measurementLabels.js';
 import { formatDate } from '../utils/dateUtils.js';
 
 /**
@@ -36,6 +36,52 @@ const getPatternsDisplay = (garment) => {
   }
 
   return items.length > 0 ? items.join(', ') : 'Standard / None';
+};
+
+/**
+ * Resolve displayable measurement fields from snapshot or raw measurements
+ */
+const resolvePdfFields = (category, measurements = {}, snapshotList = []) => {
+  if (Array.isArray(snapshotList) && snapshotList.length > 0) {
+    return snapshotList.map((s) => {
+      const liveVal = getFieldValue(measurements, s.fieldKey);
+      return {
+        key: s.fieldKey,
+        label: s.displayName || s.fieldKey,
+        val: liveVal !== '' ? String(liveVal) : (s.value !== undefined && s.value !== null ? String(s.value) : '-'),
+      };
+    });
+  }
+
+  const baseFields = category === 'shirt' ? SHIRT_FIELDS : PANT_FIELDS;
+  const result = [];
+  const knownKeys = new Set();
+
+  baseFields.forEach((f) => {
+    knownKeys.add(f.key);
+    const v = getFieldValue(measurements, f.key);
+    result.push({
+      key: f.key,
+      label: f.en || f.label,
+      val: v !== undefined && v !== null && String(v).trim().length > 0 ? String(v) : '-',
+    });
+  });
+
+  Object.keys(measurements).forEach((k) => {
+    if (k !== 'notes' && !knownKeys.has(k)) {
+      const v = measurements[k];
+      if (v !== undefined && v !== null && String(v).trim().length > 0) {
+        const cleanLabel = k.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+        result.push({
+          key: k,
+          label: cleanLabel,
+          val: String(v),
+        });
+      }
+    }
+  });
+
+  return result;
 };
 
 /**
@@ -220,14 +266,7 @@ export const generateOrderSlipPdf = (order, user = null) => {
     y += 9;
 
     // Measurement Box Grid (6 columns across contentWidth)
-    const activeShirtFields = SHIRT_FIELDS.filter((f) => {
-      const v = sMeasurements[f.key];
-      return v !== undefined && v !== null && String(v).trim().length > 0;
-    });
-
-    const displayShirtFields = activeShirtFields.length > 0
-      ? activeShirtFields
-      : SHIRT_FIELDS.slice(0, 6); // fallback standard fields if empty
+    const displayShirtFields = resolvePdfFields('shirt', sMeasurements, order.measurementSnapshot?.shirt);
 
     const colsPerRow = 6;
     const boxW = (contentWidth - (colsPerRow - 1) * 3) / colsPerRow;
@@ -244,18 +283,18 @@ export const generateOrderSlipPdf = (order, user = null) => {
       doc.setLineWidth(0.25);
       doc.roundedRect(bx, by, boxW, boxH, 1.5, 1.5, 'FD');
 
-      // Label (English + Gujarati label from field)
+      // Label (English name)
       doc.setTextColor(...COLORS.mutedText);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(6.8);
-      const labelText = field.en ? `${field.label}` : field.label;
+      const labelText = field.label || field.key;
       doc.text(labelText, bx + boxW / 2, by + 4.5, { align: 'center' });
 
       // Measurement Value
       doc.setTextColor(...COLORS.primaryNavy);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10.5);
-      const val = sMeasurements[field.key] ? String(sMeasurements[field.key]) : '-';
+      const val = field.val !== undefined && field.val !== null ? String(field.val) : (sMeasurements[field.key] ? String(sMeasurements[field.key]) : '-');
       doc.text(val, bx + boxW / 2, by + 10.5, { align: 'center' });
     });
 
@@ -310,14 +349,7 @@ export const generateOrderSlipPdf = (order, user = null) => {
     y += 9;
 
     // Measurement Box Grid
-    const activePantFields = PANT_FIELDS.filter((f) => {
-      const v = pMeasurements[f.key];
-      return v !== undefined && v !== null && String(v).trim().length > 0;
-    });
-
-    const displayPantFields = activePantFields.length > 0
-      ? activePantFields
-      : PANT_FIELDS.slice(0, 6);
+    const displayPantFields = resolvePdfFields('pant', pMeasurements, order.measurementSnapshot?.pant);
 
     const colsPerRow = 6;
     const boxW = (contentWidth - (colsPerRow - 1) * 3) / colsPerRow;
@@ -338,13 +370,14 @@ export const generateOrderSlipPdf = (order, user = null) => {
       doc.setTextColor(...COLORS.mutedText);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(6.8);
-      doc.text(field.label, bx + boxW / 2, by + 4.5, { align: 'center' });
+      const labelText = field.label || field.key;
+      doc.text(labelText, bx + boxW / 2, by + 4.5, { align: 'center' });
 
       // Measurement Value
       doc.setTextColor(...COLORS.primaryNavy);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10.5);
-      const val = pMeasurements[field.key] ? String(pMeasurements[field.key]) : '-';
+      const val = field.val !== undefined && field.val !== null ? String(field.val) : (pMeasurements[field.key] ? String(pMeasurements[field.key]) : '-');
       doc.text(val, bx + boxW / 2, by + 10.5, { align: 'center' });
     });
 

@@ -8,6 +8,7 @@ import orderRoutes from './routes/orderRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import backupRoutes from './routes/backupRoutes.js';
 import patternRoutes from './routes/patternRoutes.js';
+import measurementDefinitionRoutes from './routes/measurementDefinitionRoutes.js';
 import ownerRoutes from './routes/ownerRoutes.js';
 import { errorHandler } from './middleware/errorMiddleware.js';
 
@@ -38,6 +39,8 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/backups', backupRoutes);
 app.use('/api/patterns', patternRoutes);
+app.use('/api/pattern-definitions', patternRoutes);
+app.use('/api/measurement-definitions', measurementDefinitionRoutes);
 app.use('/api/owner', ownerRoutes);
 
 // 404 handler for unknown routes

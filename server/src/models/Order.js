@@ -1,5 +1,46 @@
 import mongoose from 'mongoose';
 
+const orderShirtMeasurementsSchema = new mongoose.Schema(
+  {
+    length: { type: String, default: '' },
+    chest: { type: String, default: '' },
+    waist: { type: String, default: '' },
+    shoulder: { type: String, default: '' },
+    sleeveLength: { type: String, default: '' },
+    sleeveOpening: { type: String, default: '' },
+    neck: { type: String, default: '' },
+    frontChest: { type: String, default: '' },
+    notes: { type: String, default: '' },
+  },
+  { _id: false, strict: false }
+);
+
+const orderPantMeasurementsSchema = new mongoose.Schema(
+  {
+    length: { type: String, default: '' },
+    waist: { type: String, default: '' },
+    hip: { type: String, default: '' },
+    thigh: { type: String, default: '' },
+    knee: { type: String, default: '' },
+    bottomOpening: { type: String, default: '' },
+    crotchRise: { type: String, default: '' },
+    notes: { type: String, default: '' },
+  },
+  { _id: false, strict: false }
+);
+
+const measurementFieldSnapshotSchema = new mongoose.Schema(
+  {
+    fieldKey: { type: String, required: true },
+    displayName: { type: String, required: true },
+    gujaratiName: { type: String, default: '' },
+    fieldType: { type: String, default: 'number' },
+    unit: { type: String, default: '' },
+    value: { type: String, default: '' },
+  },
+  { _id: false }
+);
+
 const orderSchema = new mongoose.Schema(
   {
     tenantId: {
@@ -47,7 +88,7 @@ const orderSchema = new mongoose.Schema(
     },
     measurementUnit: {
       type: String,
-      default: 'inch',
+      default: '',
     },
     shirt: {
       quantity: { type: Number, default: 0, min: 0 },
@@ -55,15 +96,8 @@ const orderSchema = new mongoose.Schema(
       pattern: { type: String, default: '' },
       customPattern: { type: String, default: '' },
       measurements: {
-        length: { type: String, default: '' },
-        chest: { type: String, default: '' },
-        waist: { type: String, default: '' },
-        shoulder: { type: String, default: '' },
-        sleeveLength: { type: String, default: '' },
-        sleeveOpening: { type: String, default: '' },
-        neck: { type: String, default: '' },
-        frontChest: { type: String, default: '' },
-        notes: { type: String, default: '' },
+        type: orderShirtMeasurementsSchema,
+        default: () => ({}),
       },
     },
     pant: {
@@ -72,14 +106,18 @@ const orderSchema = new mongoose.Schema(
       pattern: { type: String, default: '' },
       customPattern: { type: String, default: '' },
       measurements: {
-        length: { type: String, default: '' },
-        waist: { type: String, default: '' },
-        hip: { type: String, default: '' },
-        thigh: { type: String, default: '' },
-        knee: { type: String, default: '' },
-        bottomOpening: { type: String, default: '' },
-        crotchRise: { type: String, default: '' },
-        notes: { type: String, default: '' },
+        type: orderPantMeasurementsSchema,
+        default: () => ({}),
+      },
+    },
+    measurementSnapshot: {
+      shirt: {
+        type: [measurementFieldSnapshotSchema],
+        default: () => [],
+      },
+      pant: {
+        type: [measurementFieldSnapshotSchema],
+        default: () => [],
       },
     },
     specialInstructions: {

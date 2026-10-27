@@ -16,6 +16,7 @@ import { useToast } from '../context/ToastContext';
 import { SearchInput } from '../components/common/SearchInput';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { Loading } from '../components/common/Loading';
+import { notifyPatternsUpdated } from '../hooks/useTenantPatterns';
 
 export const PatternSettingsPage = () => {
   const navigate = useNavigate();
@@ -99,6 +100,7 @@ export const PatternSettingsPage = () => {
       success(res.message || 'Shirt pattern added successfully');
       setNewShirtName('');
       fetchPatterns();
+      notifyPatternsUpdated();
     } catch (err) {
       toastError(err.message || 'Failed to add shirt pattern');
     } finally {
@@ -128,6 +130,7 @@ export const PatternSettingsPage = () => {
       success(res.message || 'Pant pattern added successfully');
       setNewPantName('');
       fetchPatterns();
+      notifyPatternsUpdated();
     } catch (err) {
       toastError(err.message || 'Failed to add pant pattern');
     } finally {
@@ -164,6 +167,7 @@ export const PatternSettingsPage = () => {
       setEditingId(null);
       setEditingName('');
       fetchPatterns();
+      notifyPatternsUpdated();
     } catch (err) {
       toastError(err.message || 'Failed to update pattern');
     } finally {
@@ -184,6 +188,7 @@ export const PatternSettingsPage = () => {
       success(res.message || 'Pattern deleted successfully');
       setDeleteTarget(null);
       fetchPatterns();
+      notifyPatternsUpdated();
     } catch (err) {
       toastError(err.message || 'Failed to delete pattern');
     } finally {
@@ -537,10 +542,13 @@ export const PatternSettingsPage = () => {
           isOpen={!!deleteTarget}
           title={`Delete ${deleteTarget.type === 'shirt' ? 'Shirt' : 'Pant'} Pattern`}
           message={`Are you sure you want to delete pattern "${deleteTarget.name}"? Historical orders using this pattern will remain intact.`}
-          confirmText={deleting ? 'Deleting...' : 'Delete Pattern'}
+          confirmText="Delete Pattern"
           confirmVariant="danger"
+          danger={true}
+          loading={deleting}
           onConfirm={handleExecuteDelete}
-          onCancel={() => setDeleteTarget(null)}
+          onClose={() => !deleting && setDeleteTarget(null)}
+          onCancel={() => !deleting && setDeleteTarget(null)}
         />
       )}
 

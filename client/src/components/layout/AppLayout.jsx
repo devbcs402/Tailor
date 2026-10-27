@@ -33,6 +33,9 @@ export const AppLayout = () => {
     if (path === '/customers') {
       return { title: 'Customers', subtitle: 'Customer directory, contact details, and measurement history' };
     }
+    if (path === '/settings/measurements') {
+      return { title: 'Measurement Settings', subtitle: 'Manage tenant-wise custom shirt & pant measurements and patterns' };
+    }
     if (path === '/settings/patterns') {
       return { title: 'Pattern Settings', subtitle: 'Manage shirt patterns and pant patterns used in orders' };
     }
