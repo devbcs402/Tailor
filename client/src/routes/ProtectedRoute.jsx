@@ -14,6 +14,11 @@ export const ProtectedRoute = () => {
     return <Navigate to="/login" replace />;
   }
 
+  // Force first-login password change before entering tenant dashboard
+  if (user?.mustChangePassword) {
+    return <Navigate to="/change-password" replace />;
+  }
+
   if (user?.role === 'platform_owner') {
     return <Navigate to="/owner/dashboard" replace />;
   }

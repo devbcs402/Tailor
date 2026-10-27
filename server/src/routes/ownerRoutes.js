@@ -11,6 +11,7 @@ import {
   archiveTenant,
   restoreTenant,
   deleteTenant,
+  resetTenantAdminPassword,
   getActivityLogs,
 } from '../controllers/ownerController.js';
 
@@ -30,6 +31,7 @@ router.post('/tenants/:id/deactivate', deactivateTenant);
 router.post('/tenants/:id/archive', archiveTenant);
 router.delete('/tenants/:id', deleteTenant);
 router.post('/tenants/:id/restore', restoreTenant);
+router.post('/tenants/:id/reset-password', resetTenantAdminPassword);
 router.get('/activity-logs', getActivityLogs);
 
 export default router;

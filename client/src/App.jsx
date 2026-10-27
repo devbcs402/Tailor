@@ -6,6 +6,7 @@ import { ProtectedRoute } from './routes/ProtectedRoute';
 import { AppLayout } from './components/layout/AppLayout';
 
 import { LoginPage } from './pages/LoginPage';
+import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { CreateOrderPage } from './pages/CreateOrderPage';
 import { OrdersPage } from './pages/OrdersPage';
@@ -34,6 +35,9 @@ export function App() {
           <Routes>
             {/* Public Login Route */}
             <Route path="/login" element={<LoginPage />} />
+
+            {/* First-Login Mandatory Password Change Route */}
+            <Route path="/change-password" element={<ChangePasswordPage />} />
 
             {/* Platform Owner Login Route */}
             <Route path="/owner/login" element={<OwnerLoginPage />} />

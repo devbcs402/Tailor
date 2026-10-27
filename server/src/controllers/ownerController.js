@@ -290,6 +290,7 @@ export const createTenant = async (req, res, next) => {
       tenantId: tenant._id,
       shopName: businessName.trim(),
       isActive: true,
+      mustChangePassword: true,
     });
 
     await adminUser.save();
@@ -329,6 +330,7 @@ export const createTenant = async (req, res, next) => {
           name: adminUser.name,
           email: adminUser.email,
           role: adminUser.role,
+          mustChangePassword: adminUser.mustChangePassword,
           initialPassword,
         },
       },
@@ -768,6 +770,100 @@ export const deleteTenant = async (req, res, next) => {
           users: deletedUsersCount,
           counters: deletedCountersCount,
         },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Reset Tenant Administrator Password (Initiated by Platform Owner)
+ * Generates secure temporary password, hashes it, sets mustChangePassword: true,
+ * and records the action in AuditLog. Never exposes or resets the platform owner's credentials.
+ */
+export const resetTenantAdminPassword = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { newPassword, tempPassword: explicitTemp } = req.body;
+
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid tenant ID format provided.' });
+    }
+
+    const tenant = await Tenant.findById(id);
+    if (!tenant) {
+      return res.status(404).json({ success: false, message: 'Tenant not found.' });
+    }
+
+    // Find the primary administrator account for this tenant
+    const adminUser = await User.findOne({
+      tenantId: tenant._id,
+      role: 'admin',
+    });
+
+    if (!adminUser) {
+      return res.status(404).json({
+        success: false,
+        message: `No administrator account found for tenant "${tenant.businessName}".`,
+      });
+    }
+
+    // Safety: Protect platform owner accounts
+    if (adminUser.role === 'platform_owner') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot reset credentials of platform owner account through tenant reset.',
+      });
+    }
+
+    // Generate or validate temporary password
+    const suppliedPassword = (newPassword || explicitTemp || '').trim();
+    let tempPassword = suppliedPassword || null;
+    if (!tempPassword) {
+      const randLetters = Math.random().toString(36).slice(-5).toUpperCase();
+      const randDigits = Math.floor(1000 + Math.random() * 9000);
+      tempPassword = `Temp@${randLetters}${randDigits}!`;
+    } else if (tempPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'Temporary password must be at least 8 characters long.',
+      });
+    }
+
+    const passwordHash = await User.hashPassword(tempPassword);
+    adminUser.passwordHash = passwordHash;
+    adminUser.mustChangePassword = true;
+    await adminUser.save();
+
+    // Record in AuditLog
+    try {
+      await AuditLog.create({
+        actor: req.user._id,
+        actorEmail: req.user.email,
+        actorRole: req.user.role,
+        action: 'tenant_admin_password_reset',
+        targetTenant: tenant._id,
+        targetTenantName: tenant.businessName,
+        details: {
+          adminEmail: adminUser.email,
+          forcedChange: true,
+          resetAt: new Date(),
+        },
+        ipAddress: req.ip || '',
+        userAgent: req.headers['user-agent'] || '',
+      });
+    } catch (auditErr) {
+      console.warn('[Audit Warning] Could not record password reset audit:', auditErr.message);
+    }
+
+    return res.json({
+      success: true,
+      message: `Password reset successfully for administrator "${adminUser.email}". They will be forced to change it on their next login.`,
+      data: {
+        adminEmail: adminUser.email,
+        temporaryPassword: tempPassword,
+        mustChangePassword: true,
       },
     });
   } catch (error) {

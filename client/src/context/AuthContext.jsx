@@ -55,6 +55,22 @@ export const AuthProvider = ({ children }) => {
     throw new Error(res.message || 'Login failed');
   };
 
+  const changePassword = async (data) => {
+    const res = await authApi.changePassword(data);
+    if (res.success) {
+      if (res.token) {
+        localStorage.setItem('tailor_token', res.token);
+        setToken(res.token);
+      }
+      if (res.user) {
+        localStorage.setItem('tailor_user', JSON.stringify(res.user));
+        setUser(res.user);
+      }
+      return res;
+    }
+    throw new Error(res.message || 'Password update failed');
+  };
+
   const logout = async () => {
     try {
       await authApi.logout();
@@ -77,6 +93,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         login,
         logout,
+        changePassword,
       }}
     >
       {children}

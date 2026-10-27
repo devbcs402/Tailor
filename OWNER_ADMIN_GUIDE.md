@@ -1,33 +1,51 @@
 # Platform Owner Administration Guide: Multi-Tenant Tailor Management SaaS
 
-This guide explains the architecture, security policies, and day-to-day operations of the **Platform Owner Admin Website** for the Multi-Tenant Tailor Management SaaS.
+This guide explains the architecture, security policies, operations, database cleanup procedures, and password management of the **Platform Owner Admin Website** for the Multi-Tenant Tailor Management SaaS.
 
 ---
 
 ## Table of Contents
 
-1. [Initial Platform Owner Bootstrap](#1-how-to-create-the-initial-platform-owner)
-2. [Starting the Application](#2-how-to-start-the-application)
-3. [Logging in to the Owner Admin Portal](#3-how-to-log-in-to-the-owner-website)
-4. [Creating a New Tailoring Business Tenant](#4-how-to-create-a-tenant)
-5. [Setting Up Tenant Administrator Accounts](#5-how-to-set-up-the-tenant-administrator)
-6. [Editing Tenant Business Profiles](#6-how-to-edit-tenant-details)
-7. [Activating and Deactivating Tenants (Suspension)](#7-how-to-activate-or-deactivate-a-tenant)
-8. [Tenant Archival and Safe Deletion Policy](#8-how-tenant-archivaldeletion-works)
-9. [Recovering and Restoring Archived Tenants](#9-how-to-recover-an-archived-tenant)
-10. [Tenant Data Isolation and Security Architecture](#10-how-tenant-data-isolation-works)
-11. [Database Backup and Migration Procedures](#11-how-to-back-up-and-migrate-the-database)
-12. [Secure Production Deployment Guidelines](#12-how-to-deploy-securely)
+1. [Platform Architecture & Roles](#1-platform-architecture--roles)
+2. [Initial Platform Owner Bootstrap](#2-initial-platform-owner-bootstrap)
+3. [Starting the Application](#3-starting-the-application)
+4. [Database Backup & One-Time Cleanup (Clean Slate Reset)](#4-database-backup--one-time-cleanup-clean-slate-reset)
+5. [Logging in to the Owner Admin Portal](#5-logging-in-to-the-owner-admin-portal)
+6. [Creating a New Tailoring Business Tenant](#6-creating-a-new-tailoring-business-tenant)
+7. [Initial Administrator Onboarding & First-Login Password Change](#7-initial-administrator-onboarding--first-login-password-change)
+8. [Owner-Initiated Tenant Administrator Password Reset](#8-owner-initiated-tenant-administrator-password-reset)
+9. [Editing Tenant Business Profiles](#9-editing-tenant-business-profiles)
+10. [Activating and Deactivating Tenants (Suspension)](#10-activating-and-deactivating-tenants-suspension)
+11. [Tenant Archival and Safe Deletion Policy](#11-tenant-archival-and-safe-deletion-policy)
+12. [Tenant Data Isolation and Security Architecture](#12-tenant-data-isolation-and-security-architecture)
+13. [Troubleshooting Login and Tenant-Access Issues](#13-troubleshooting-login-and-tenant-access-issues)
+14. [Verification Test Commands](#14-verification-test-commands)
 
 ---
 
-## 1. How to Create the Initial Platform Owner
+## 1. Platform Architecture & Roles
 
-To prevent privilege escalation and unauthorized platform administration, **no public sign-up endpoint exists for platform owners**. Platform owners must be bootstrapped via CLI on the server machine.
+The system uses a strictly enforced Role-Based Access Control (RBAC) model:
 
-### Bootstrap Script
+- **Platform Owner (`role: 'platform_owner'`):**
+  - Global supervisor of the SaaS platform.
+  - Can create, activate, deactivate, edit, archive, and delete tenants.
+  - Can reset tenant administrator passwords and trigger temporary credentials.
+  - Has `tenantId: null` and cannot directly inject business records into tenants without explicit scoping.
+  - Accesses owner management at `http://localhost:5173/owner/*`.
+- **Tenant Administrator (`role: 'admin'`):**
+  - Manager of an individual tailoring business tenant (`tenantId: <ObjectId>`).
+  - Manages orders, customers, measurements, patterns, and staff for their shop.
+  - Has `mustChangePassword: true` on initial account creation or after owner reset.
+  - Restricted to tenant dashboard at `http://localhost:5173/*`. Forbidden from `/api/owner/*`.
+- **Tenant Staff / Tailor (`role: 'tailor'`, `'staff'`):**
+  - Employees bound strictly to their shop's `tenantId`.
 
-From the `server/` directory, run:
+---
+
+## 2. Initial Platform Owner Bootstrap
+
+To prevent privilege escalation, **no public sign-up endpoint exists for platform owners**. Platform owners must be created via CLI on the server machine:
 
 ```bash
 cd server
@@ -36,8 +54,6 @@ node src/scripts/create_platform_owner.js
 
 ### Providing Custom Credentials
 
-You can pass environment variables or customize defaults:
-
 ```bash
 PLATFORM_OWNER_EMAIL="owner@platform.com" \
 PLATFORM_OWNER_PASS="Owner@Pass2026!" \
@@ -45,22 +61,11 @@ PLATFORM_OWNER_NAME="Central Platform Owner" \
 node src/scripts/create_platform_owner.js
 ```
 
-### Password Requirements
-
-- Minimum 8 characters.
-- Must include uppercase, lowercase, numbers, and special symbols.
-- Passwords are securely hashed using bcrypt (10 rounds).
-
 ---
 
-## 2. How to Start the Application
+## 3. Starting the Application
 
 The system consists of a Node.js/Express backend API on port `5000` and a Vite React frontend on port `5173`.
-
-### Prerequisites
-
-- Node.js v18+ or v20+
-- MongoDB running locally at `mongodb://127.0.0.1:27017/tailor_management` (or configured via `.env`)
 
 ### Step 1: Start Backend Server
 
@@ -86,9 +91,64 @@ npm run dev
 
 ---
 
-## 3. How to Log in to the Owner Website
+## 4. Database Backup & One-Time Cleanup (Clean Slate Reset)
 
-The Owner Admin Website operates on dedicated routes isolated from tenant shops:
+When preparing the platform for new tenant registrations, use the automated cleanup utility: [cleanup_tenants.js](file:///d:/YASH%20KACHA/Tai/server/src/scripts/cleanup_tenants.js).
+
+### Data Preservation vs Deletion Matrix
+
+| Scope | Preserved | Purged | Description |
+| :--- | :---: | :---: | :--- |
+| **Platform Owner Account** | **YES** | NO | Verified by `role: 'platform_owner'`. Credentials & ID untouched. |
+| **Global Audit Logs** | **YES** | NO | Security audit history and cleanup audit records preserved. |
+| **System Configurations** | **YES** | NO | Global schema defaults and system settings remain intact. |
+| **Tenants** | NO | **YES** | All existing tenant documents are purged. |
+| **Tenant Users & Staff** | NO | **YES** | All users with `tenantId != null` and `role != 'platform_owner'`. |
+| **Customers & Measurements** | NO | **YES** | All tenant-owned customer profiles and body measurements. |
+| **Orders & Items** | NO | **YES** | All tenant-owned orders, item lines, and garment photos. |
+| **Patterns** | NO | **YES** | All tenant-specific pattern templates. |
+| **Order Counters** | NO | **YES** | All tenant sequence counters (`order_seq_*`). |
+
+### Step 1: Pre-Cleanup Safety Backup
+
+Before executing any deletion, the cleanup script automatically generates a full JSON snapshot of all collections to:
+`server/backups/pre_cleanup_backup_<timestamp>.json`
+
+You can also run a native MongoDB dump at any time:
+```bash
+mongodump --db=tailor_management --out=./backups/manual_$(date +%Y%m%d_%H%M%S)
+```
+
+### Step 2: Running Dry-Run Inspection
+
+To preview the cleanup scope without altering any data:
+
+```bash
+cd server
+node src/scripts/cleanup_tenants.js
+```
+
+The script verifies the platform owner, reports collection record counts, and halts with a safety notice.
+
+### Step 3: Executing Confirmed Cleanup
+
+To execute the atomic cleanup:
+
+```bash
+cd server
+node src/scripts/cleanup_tenants.js --confirm
+```
+
+The script:
+1. Verifies the platform owner account.
+2. Writes a full backup to `server/backups/`.
+3. Purges all tenant-owned collections.
+4. Records a `database_cleanup_executed` event in `AuditLog`.
+5. Verifies post-cleanup record counts (0 tenants, 1 active platform owner).
+
+---
+
+## 5. Logging in to the Owner Admin Portal
 
 1. Navigate to: **`http://localhost:5173/owner/login`**
 2. Enter the Platform Owner credentials:
@@ -96,141 +156,157 @@ The Owner Admin Website operates on dedicated routes isolated from tenant shops:
    - **Password:** `Owner@Pass2026!`
 3. Click **Sign in to Platform**.
 
-### Role-Based Access Control (RBAC) Enforcement
-
-- The system verifies `user.role === 'platform_owner'`.
-- If a tenant administrator or tailor attempts to log in at `/owner/login`, the backend rejects the session with HTTP 403: *"Access denied. Platform owner privileges required."*
-- Unauthenticated access to any `/owner/*` route automatically redirects to `/owner/login`.
-- If a platform owner logs in via the standard `/login` page, they are redirected automatically to `/owner/dashboard`.
+*Unauthenticated requests to `/owner/*` automatically redirect to `/owner/login`.*
 
 ---
 
-## 4. How to Create a Tenant
+## 6. Creating a New Tailoring Business Tenant
 
-1. Open `/owner/tenants` and click **+ Create New Tenant** (or navigate directly to `/owner/tenants/create`).
-2. Fill out the comprehensive onboarding form:
-   - **Business Name:** e.g., `Royal Tailors Studio`
-   - **Tenant Code (optional):** Auto-generated by backend if omitted (e.g., `ROYAL-8821`), or enter a custom uppercase alphanumeric slug (e.g., `ROYAL-LUXE`).
-   - **Owner Contact Information:** Primary contact name, email, mobile (10 digits).
-   - **Business Address:** Street address, City, State, and 6-digit Pincode.
-   - **Initial Administrator Account:**
-     - Admin Name
-     - Admin Email (must be unique across active platform users)
-     - Admin Mobile
-     - Temporary Password
-3. Click **Create Tenant & Provision Workspace**.
-4. The backend transactionally:
-   - Creates the `Tenant` document with status `active`.
-   - Seeds standard tailoring starter patterns (13 core shirt & pant styles).
-   - Creates the tenant administrator `User` with role `admin` bound to the new `tenantId`.
-   - Logs the action in `AuditLog`.
-   - Returns tenant details and credentials confirmation.
+Platform owners can create new tenants from `http://localhost:5173/owner/tenants/create` or via the modal on `/owner/tenants`.
+
+### Required Information:
+
+- **Business Details:** Business name, owner name, contact email, mobile number, full address, city, state, pincode.
+- **Initial Administrator Account:** Full name, email address, and temporary password.
+
+### Automated Provisioning Pipeline:
+
+When the platform owner submits the form:
+1. **Tenant Document Created:** Created with status `active` and auto-generated `tenantCode` (e.g. `SAVIL-1042`).
+2. **Standard Patterns Seeded:** 13 core shirt, pant, and suit templates seeded automatically.
+3. **Tenant Admin User Provisioned:** Created with `role: 'admin'`, linked to `tenantId`, and **`mustChangePassword: true`** explicitly set.
+4. **Password Hashing:** Passwords are hashed with bcrypt (10 rounds). Plaintext passwords are never logged or stored.
+5. **Audit Logging:** Logs a `tenant_created` event in `AuditLog`.
 
 ---
 
-## 5. How to Set Up the Tenant Administrator
+## 7. Initial Administrator Onboarding & First-Login Password Change
 
-When creating a new tenant:
+### First Login Flow
 
-- The initial administrator receives the credentials set during tenant creation.
-- Once created, the tenant admin logs in at the standard tenant portal: **`http://localhost:5173/login`**.
-- The tenant admin's dashboard displays **only their own shop's orders, customers, patterns, and staff**.
-- Tenant administrators cannot modify their `tenantId`, alter other businesses' records, or access platform owner endpoints.
+1. Tenant administrator navigates to the tenant portal: **`http://localhost:5173/login`**.
+2. Enters their initial temporary credentials.
+3. The backend validates credentials and returns `{ user: { mustChangePassword: true }, token: ... }`.
+4. The frontend detects `mustChangePassword === true` and redirects immediately to **`/change-password`**.
+
+### Backend Enforcement (Zero Bypass)
+
+The password change requirement is enforced centrally in [authMiddleware.js](file:///d:/YASH%20KACHA/Tai/server/src/middleware/authMiddleware.js):
+
+- Any authenticated request with `mustChangePassword: true` attempting to access normal business endpoints (`/api/dashboard/*`, `/api/customers/*`, `/api/orders/*`, `/api/patterns/*`, etc.) is **blocked with HTTP 403 Forbidden**:
+  ```json
+  {
+    "success": false,
+    "code": "MUST_CHANGE_PASSWORD",
+    "message": "You must change your initial password before accessing business operations."
+  }
+  ```
+- **Only** the following safe authentication endpoints are permitted:
+  - `POST /api/auth/change-password`
+  - `GET /api/auth/me`
+  - `POST /api/auth/logout`
+
+### Password Policy Requirements
+
+The Change Password page (`/change-password`) enforces strict security policies on both frontend and backend:
+
+- **Minimum Length:** At least 12 characters.
+- **Complexity:** Must include at least 1 uppercase letter, 1 lowercase letter, and 1 number.
+- **Current Password Verification:** Must provide correct current/initial password.
+- **Identity Rejection:** New password **cannot be identical** to the initial temporary password.
+- **Confirmation Match:** New password and confirmation must match identically.
+
+### Post-Change Execution
+
+Upon submitting valid new credentials to `POST /api/auth/change-password`:
+1. The backend hashes the new password with bcrypt.
+2. Updates `user.mustChangePassword = false`.
+3. Issues a fresh JWT authentication token.
+4. Records `password_changed` in `AuditLog`.
+5. The user is redirected to the tenant dashboard (`/dashboard`) with full operational access.
+6. Subsequent logins use the new password directly without prompting for a change.
 
 ---
 
-## 6. How to Edit Tenant Details
+## 8. Owner-Initiated Tenant Administrator Password Reset
+
+If a tenant administrator forgets their password or experiences a security issue, the platform owner can reset their credentials directly from the Owner Admin Website:
+
+1. Navigate to `/owner/tenants` and click on the tenant to open **Tenant Details**.
+2. Click the **Reset Admin Password** button (`<KeyRound />`).
+3. In the modal:
+   - Provide a custom temporary password (minimum 8 characters), OR
+   - Click **Generate Secure Password** to generate a randomized temporary credential (e.g. `Temp@K9X72!`).
+4. Click **Reset & Force Password Change**.
+5. The backend:
+   - Finds the primary administrator for that tenant (`role: 'admin'`, `tenantId`).
+   - Securely hashes the temporary password.
+   - Sets **`mustChangePassword: true`**.
+   - Preserves all business data (orders, customers, patterns).
+   - Records `tenant_admin_password_reset` in `AuditLog`.
+6. Copy the generated temporary credential using the **Copy** button and share it securely with the business owner.
+7. Upon their next login with the temporary password, the administrator is forced to complete the `/change-password` workflow before accessing business operations.
+
+---
+
+## 9. Editing Tenant Details
 
 Platform owners can modify business information, contacts, and addresses without disrupting operations or altering historical data:
 
-1. In `/owner/tenants`, find the tenant and click the **Actions** menu `...` -> **Edit Tenant Details** (or navigate to `/owner/tenants/:tenantId/edit`).
+1. In `/owner/tenants`, find the tenant and click **Edit Tenant Details** (or `/owner/tenants/:tenantId/edit`).
 2. Update allowed fields:
    - Business Name
    - Owner Contact Name, Email, and Phone
-   - Business Street Address, City, State, Pincode
+   - Street Address, City, State, Pincode
 3. Click **Save Changes**.
-
-### Integrity & Safety Protections
-
-- The system protects the immutable `tenantId` and `tenantCode`.
-- Existing orders, customers, measurements, and patterns remain completely intact.
-- Duplicate email/phone validation is enforced.
 
 ---
 
-## 7. How to Activate or Deactivate a Tenant
+## 10. Activating and Deactivating Tenants (Suspension)
 
-When a tailoring business pauses their subscription or fails payment, the platform owner can suspend their access without destroying their business data.
+When a tailoring business pauses their subscription or fails payment, the platform owner can suspend their access without destroying their business data:
 
 ### Deactivating a Tenant (Suspension)
 
-1. Open `/owner/tenants`, find an active tenant, and click **Suspend Tenant** (or click **Suspend Business** on the Tenant Details page).
-2. A safety confirmation modal appears detailing:
-   - Tenant business name.
-   - Immediate revocation of staff access.
-   - Assurance that all records (customers, orders, measurements) remain securely stored.
-3. Confirm deactivation.
-4. **Immediate Enforcement:**
+1. Open `/owner/tenants`, find the active tenant, and click **Suspend Tenant** (`POST /api/owner/tenants/:id/deactivate`).
+2. **Immediate Enforcement:**
    - Tenant document status changes to `inactive`.
-   - `deactivatedAt` and `deactivatedBy` timestamps are stored.
-   - In `authMiddleware.js`, every incoming authenticated request from users belonging to this tenant is **immediately rejected with HTTP 403 `TENANT_INACTIVE`**.
+   - In [authMiddleware.js](file:///d:/YASH%20KACHA/Tai/server/src/middleware/authMiddleware.js), every incoming authenticated request from users belonging to this tenant is **immediately rejected with HTTP 403 `TENANT_INACTIVE`**.
    - Active JWT tokens immediately cease to authorize business operations without waiting for token expiry.
-   - New login attempts by any staff of this tenant are rejected with: *"Your business account has been deactivated. Please contact platform support."*
+   - New login attempts are rejected with: *"Your business account has been deactivated. Please contact platform support."*
 
-### Activating a Tenant
+### Reactivating a Tenant
 
-1. Open `/owner/tenants`, filter by status **Inactive**, find the tenant, and click **Activate Tenant**.
+1. Open `/owner/tenants`, filter by status **Inactive**, find the tenant, and click **Activate Tenant** (`POST /api/owner/tenants/:id/activate`).
 2. Tenant status updates to `active`.
-3. Normal login and operational API access are restored instantly for all authorized users of that tenant.
+3. Normal login and operational API access are restored instantly.
 
 ---
 
-## 8. How Tenant Archival and Permanent Deletion Works
+## 11. Tenant Archival and Safe Deletion Policy
 
-The platform supports two tiers of tenant termination depending on the operational requirement:
+The platform supports two tiers of tenant termination:
 
 ### Option A: Safe Archival (Soft Delete)
 For businesses pausing subscriptions or closing temporarily:
 1. In `/owner/tenants`, click the **Archive** button (`<Archive />`).
-2. An alert modal confirms the archival.
-3. The system sets `tenant.status = 'archived'` and disables user accounts.
-4. All customer records, order histories, and measurements are **permanently preserved** in MongoDB. The platform owner can restore the studio at any time.
+2. The system sets `tenant.status = 'archived'` and disables user accounts.
+3. All customer records, order histories, and measurements are **permanently preserved** in MongoDB. The platform owner can restore the studio at any time.
 
 ### Option B: Permanent Tenant Deletion (Full Cascade Cleanup)
 When a platform owner explicitly deletes a tenant (e.g. fraudulent registration, test tenant cleanup, GDPR/compliance data erasure):
 1. In `/owner/tenants`, click the red **Delete** button (`<Trash2 />`).
-2. A prominent confirmation dialog displays the tenant's business name and code, warning that all associated data belonging exclusively to this shop will be permanently removed.
-3. Upon confirmation, the backend executes an atomic transaction (with safe staged fallback) via `DELETE /api/owner/tenants/:tenantId`:
+2. A confirmation dialog displays the tenant's business name and code, warning of permanent data removal.
+3. Upon confirmation, the backend executes `DELETE /api/owner/tenants/:tenantId`:
    - Validates platform-owner privileges (HTTP 403 for unauthorized users).
    - Prevents deletion of the currently active session or platform owner accounts.
-   - Deletes all `Order` records belonging strictly to this tenant (`tenantId`).
-   - Deletes all `Customer` records and embedded measurement profiles belonging strictly to this tenant.
-   - Deletes all `Pattern` templates belonging strictly to this tenant.
-   - Deletes all `OrderCounter` sequence counters matching `order_seq_${tenantId}_*`.
-   - Deletes all `User` staff/admin accounts (`tenantId`, protecting `role: 'platform_owner'`).
+   - Cascades deletion to all `Order`, `Customer`, `Pattern`, `OrderCounter`, and `User` records belonging strictly to this `tenantId`.
    - Deletes the `Tenant` document itself.
-   - Records a `tenant_deleted` event in `AuditLog` preserving an audit trace.
-4. The table and dashboard statistics immediately refresh without a full-page reload, and pagination automatically adjusts if the last tenant on a page is deleted.
+   - Records a `tenant_deleted` event in `AuditLog`.
 
 ---
 
-## 9. How to Recover an Archived Tenant
-
-If a tailoring business returns or requests reactivation:
-
-1. Navigate to `/owner/tenants`.
-2. Select the **Archived** filter tab to view archived businesses.
-3. Click **Restore Tenant** on the tenant row (or on the Tenant Details page).
-4. The system:
-   - Sets `tenant.status = 'active'`.
-   - Clears `archivedAt`, `archivedBy`, and `archiveReason`.
-   - Restores the primary tenant administrator's account (`isActive: true`).
-   - Logs `tenant_restored` in `AuditLog`.
-5. The tailoring business immediately regains access with all customer profiles, measurements, orders, and patterns completely intact.
-
----
-
-## 10. How Tenant Data Isolation Works
+## 12. Tenant Data Isolation and Security Architecture
 
 Multi-tenancy uses a **Shared Database, Isolated Documents** architecture with defense-in-depth security:
 
@@ -242,127 +318,65 @@ Multi-tenancy uses a **Shared Database, Isolated Documents** architecture with d
    ├── Verifies JWT signature and expiry
    ├── Loads user and tenant from MongoDB
    ├── Validates tenant is active (blocks 'inactive' & 'archived')
+   ├── Enforces mustChangePassword check (HTTP 403 MUST_CHANGE_PASSWORD)
    └── Injects req.tenantId = user.tenantId
            │
            ▼
 [ Controllers (Customer, Order, Pattern, etc.) ]
    ├── Injects { tenantId: req.tenantId } into EVERY query filter
-   │     e.g., Order.find({ tenantId: req.tenantId, ... })
-   ├── Cross-validates foreign references
-   │     e.g., Customer must belong to req.tenantId before order creation
-   └── Atomic Sequence Counter scoped per tenant
-         e.g., "order_seq_${tenantId}_2026"
+   └── Cross-validates foreign references before mutations
 ```
 
 ### Security Guarantees
 
-1. **No Browser Trust:** The server never uses a client-supplied `tenantId` query or body parameter to determine ownership. The `req.tenantId` is strictly derived from the validated JWT session.
+1. **No Browser Trust:** The server never uses a client-supplied `tenantId` parameter to determine ownership. The `req.tenantId` is strictly derived from the validated JWT session.
 2. **Compound Database Indexes:** Every business collection features compound indexes starting with `tenantId`:
    - `Customer`: `{ tenantId: 1, mobile: 1 }` (unique per tenant), `{ tenantId: 1, name: 1 }`
    - `Order`: `{ tenantId: 1, orderNumber: 1 }` (unique per tenant), `{ tenantId: 1, status: 1 }`
    - `Pattern`: `{ tenantId: 1, type: 1, name: 1 }` (unique per tenant)
-   - `User`: `{ tenantId: 1, email: 1 }`, `{ tenantId: 1, role: 1 }`
-3. **Cross-Tenant Attack Prevention:** If Tenant A attempts to fetch or edit `Customer` ID belonging to Tenant B, the query `Customer.findOne({ _id: targetId, tenantId: tenantA_Id })` returns `null` (HTTP 404).
+   - `User`: `{ tenantId: 1, email: 1 }`, `{ tenantId: 1, role: 1 }`, `{ mustChangePassword: 1 }`
+3. **Cross-Tenant Attack Prevention:** Queries scoped to one tenant cannot view or modify documents belonging to another tenant.
 
 ---
 
-## 11. How to Back Up and Migrate the Database
+## 13. Troubleshooting Login and Tenant-Access Issues
 
-### Automated Migration Script
+### Problem 1: "You must change your initial password before accessing business operations" (HTTP 403 MUST_CHANGE_PASSWORD)
+- **Cause:** User has `mustChangePassword: true` on their account.
+- **Resolution:** Navigate to `/change-password` and set a new password meeting policy rules (min 12 characters, uppercase, lowercase, number).
 
-The system includes a fully automated, idempotent migration script that backs up and maps existing single-tenant tailor data into multi-tenant structures:
+### Problem 2: "Your business account has been deactivated" (HTTP 403 TENANT_INACTIVE)
+- **Cause:** The tenant business has been suspended by the platform owner.
+- **Resolution:** Platform owner logs into `/owner/tenants`, finds the tenant, and clicks **Activate Tenant**.
+
+### Problem 3: Platform Owner Login Fails with "Invalid email or password"
+- **Cause:** Credentials mismatch or owner account missing.
+- **Resolution:** Re-run the bootstrap script:
+  ```bash
+  cd server
+  node src/scripts/create_platform_owner.js
+  ```
+
+### Problem 4: Resetting Admin Password Did Not Work
+- **Cause:** The tenant has no user with `role: 'admin'` or the temporary password was entered incorrectly.
+- **Resolution:** Open the tenant details page at `/owner/tenants/:id`, verify the administrator email in the users list, and click **Reset Admin Password** to generate a new temporary credential.
+
+---
+
+## 14. Verification Test Commands
+
+To verify platform health, forced first-login password changes, and tenant isolation:
 
 ```bash
+# 1. First-login flow, forced password change, owner reset, and isolation (27 tests)
 cd server
-node src/scripts/migrate_to_multitenant.js
-```
+node src/scripts/verify_first_login_flow.js
 
-### What the Migration Does
-
-1. **Safety Backup:** Dumps collections to `server/backups/backup_<timestamp>/`.
-2. **Tenant Provisioning:** Creates or maps default tenant "Silai Master Tailor Studio" (`SILAI-MASTER`).
-3. **Backfill `tenantId`:** Updates all existing `users`, `customers`, `orders`, `patterns`, and `ordercounters`.
-4. **Starter Pattern Provisioning:** Seeds standard pattern templates.
-5. **Index Migration:** Drops single-tenant global unique indexes (e.g., `mobile_1`) and builds compound multi-tenant indexes (e.g., `{ tenantId: 1, mobile: 1 }`).
-6. **Audit Verification:** Verifies zero orphaned records exist.
-
-### Manual MongoDB Backup
-
-```bash
-# Full Database Backup
-mongodump --db=tailor_management --out=./backups/manual_$(date +%Y%m%d_%H%M%S)
-
-# Full Database Restore
-mongorestore --db=tailor_management ./backups/manual_20261027_000000/tailor_management
-```
-
----
-
-## 12. How to Deploy Securely
-
-### 1. Environment Configuration
-
-Ensure production `.env` contains secure, unique values:
-
-```env
-PORT=5000
-NODE_ENV=production
-MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/tailor_management?retryWrites=true&w=majority
-JWT_SECRET=super_long_random_64_character_hex_string
-JWT_EXPIRE=7d
-CORS_ORIGIN=https://admin.yourtailordomain.com,https://app.yourtailordomain.com
-```
-
-### 2. HTTPS & Reverse Proxy (Nginx)
-
-Always run behind HTTPS to secure JWT tokens and tenant cookies in transit.
-
-```nginx
-server {
-    listen 443 ssl http2;
-    server_name admin.yourtailordomain.com;
-
-    ssl_certificate /etc/letsencrypt/live/yourtailordomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/yourtailordomain.com/privkey.pem;
-
-    location /api/ {
-        proxy_pass http://localhost:5000/api/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-    }
-
-    location / {
-        root /var/www/tailor-client/dist;
-        try_files $uri $uri/ /index.html;
-    }
-}
-```
-
-### 3. Production Frontend Build
-
-```bash
-cd client
-npm run build
-```
-
-Deploy the generated `dist/` directory to your web server (Nginx, Cloudflare Pages, AWS S3/CloudFront).
-
----
-
-## Verification Test Commands
-
-To verify complete multi-tenant platform health at any time, run:
-
-```bash
-# 1. Multi-tenant architecture & lifecycle verification (15 test suites)
-cd server
+# 2. Multi-tenant architecture & lifecycle verification (15 test suites)
 node src/scripts/verify_multitenant_backend.js
 
-# 2. Existing tailor shop operations & order integrity verification
+# 3. Existing tailor shop operations & order integrity verification
 node src/scripts/verify_system.js
 ```
 
-Both test suites should return **`100% PASSED`**.
+All test suites will return **`100% PASSED`**.

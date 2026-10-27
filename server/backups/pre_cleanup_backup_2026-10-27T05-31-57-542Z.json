@@ -1,0 +1,199 @@
+{
+  "metadata": {
+    "createdAt": "2026-10-27T05:31:57.555Z",
+    "reason": "Automated pre-cleanup safety snapshot before tenant reset",
+    "platformOwners": [
+      "owner@platform.com"
+    ]
+  },
+  "data": {
+    "tenants": [
+      {
+        "_id": "6ae0374592a0a7731ff0bcfa",
+        "businessName": "Savile Row Bespoke",
+        "tenantCode": "SAVIL-1480",
+        "ownerName": "Arthur Pendelton",
+        "email": "admin@savilerow.com",
+        "mobileNumber": "9876543210",
+        "address": "1 Savile Row, Mayfair",
+        "city": "London",
+        "state": "Greater London",
+        "pincode": "W1S 2ER",
+        "status": "active",
+        "deactivatedAt": null,
+        "deactivatedBy": null,
+        "archivedAt": null,
+        "archivedBy": null,
+        "archiveReason": "",
+        "notes": "Premier bespoke tailoring house",
+        "createdAt": "2026-10-27T05:31:49.477Z",
+        "updatedAt": "2026-10-27T05:31:51.267Z",
+        "__v": 0
+      }
+    ],
+    "users": [
+      {
+        "_id": "6adf52b3faad847e672e4d3d",
+        "name": "Central Platform Owner",
+        "email": "owner@platform.com",
+        "passwordHash": "$2a$10$twZ4Fc6yPt39blyX7pMKouikF4UU1G4UFmnFMg64TX8.EX7Zk2mYC",
+        "role": "platform_owner",
+        "tenantId": null,
+        "shopName": "Central Platform Administration",
+        "isActive": true,
+        "createdAt": "2026-10-26T13:16:35.059Z",
+        "updatedAt": "2026-10-26T13:16:35.059Z",
+        "__v": 0
+      },
+      {
+        "_id": "6ae0374592a0a7731ff0bcfc",
+        "name": "Arthur Pendelton",
+        "email": "admin@savilerow.com",
+        "passwordHash": "$2a$10$m0Xz.O3uqBN1ux9HvNN/hubs1oKRsndvHXeSuk8YYHccFqPAWi9l2",
+        "role": "admin",
+        "tenantId": "6ae0374592a0a7731ff0bcfa",
+        "shopName": "Savile Row Bespoke",
+        "isActive": true,
+        "mustChangePassword": true,
+        "createdAt": "2026-10-27T05:31:49.594Z",
+        "updatedAt": "2026-10-27T05:31:51.297Z",
+        "__v": 0
+      }
+    ],
+    "customers": [],
+    "orders": [],
+    "patterns": [
+      {
+        "_id": "6ae0374592a0a7731ff0bcff",
+        "tenantId": "6ae0374592a0a7731ff0bcfa",
+        "name": "Plain",
+        "type": "shirt",
+        "isActive": true,
+        "__v": 0,
+        "createdAt": "2026-10-27T05:31:49.625Z",
+        "updatedAt": "2026-10-27T05:31:49.625Z"
+      },
+      {
+        "_id": "6ae0374592a0a7731ff0bd00",
+        "tenantId": "6ae0374592a0a7731ff0bcfa",
+        "name": "Chex",
+        "type": "shirt",
+        "isActive": true,
+        "__v": 0,
+        "createdAt": "2026-10-27T05:31:49.625Z",
+        "updatedAt": "2026-10-27T05:31:49.625Z"
+      },
+      {
+        "_id": "6ae0374592a0a7731ff0bd01",
+        "tenantId": "6ae0374592a0a7731ff0bcfa",
+        "name": "Stripes",
+        "type": "shirt",
+        "isActive": true,
+        "__v": 0,
+        "createdAt": "2026-10-27T05:31:49.625Z",
+        "updatedAt": "2026-10-27T05:31:49.625Z"
+      },
+      {
+        "_id": "6ae0374592a0a7731ff0bd02",
+        "tenantId": "6ae0374592a0a7731ff0bcfa",
+        "name": "Printed",
+        "type": "shirt",
+        "isActive": true,
+        "__v": 0,
+        "createdAt": "2026-10-27T05:31:49.625Z",
+        "updatedAt": "2026-10-27T05:31:49.625Z"
+      },
+      {
+        "_id": "6ae0374592a0a7731ff0bd03",
+        "tenantId": "6ae0374592a0a7731ff0bcfa",
+        "name": "Kurta Collar",
+        "type": "shirt",
+        "isActive": true,
+        "__v": 0,
+        "createdAt": "2026-10-27T05:31:49.625Z",
+        "updatedAt": "2026-10-27T05:31:49.625Z"
+      },
+      {
+        "_id": "6ae0374592a0a7731ff0bd04",
+        "tenantId": "6ae0374592a0a7731ff0bcfa",
+        "name": "Chinese Collar",
+        "type": "shirt",
+        "isActive": true,
+        "__v": 0,
+        "createdAt": "2026-10-27T05:31:49.625Z",
+        "updatedAt": "2026-10-27T05:31:49.625Z"
+      },
+      {
+        "_id": "6ae0374592a0a7731ff0bd05",
+        "tenantId": "6ae0374592a0a7731ff0bcfa",
+        "name": "Plain",
+        "type": "pant",
+        "isActive": true,
+        "__v": 0,
+        "createdAt": "2026-10-27T05:31:49.625Z",
+        "updatedAt": "2026-10-27T05:31:49.625Z"
+      },
+      {
+        "_id": "6ae0374592a0a7731ff0bd06",
+        "tenantId": "6ae0374592a0a7731ff0bcfa",
+        "name": "Formal",
+        "type": "pant",
+        "isActive": true,
+        "__v": 0,
+        "createdAt": "2026-10-27T05:31:49.625Z",
+        "updatedAt": "2026-10-27T05:31:49.625Z"
+      },
+      {
+        "_id": "6ae0374592a0a7731ff0bd07",
+        "tenantId": "6ae0374592a0a7731ff0bcfa",
+        "name": "Two Pocket",
+        "type": "pant",
+        "isActive": true,
+        "__v": 0,
+        "createdAt": "2026-10-27T05:31:49.625Z",
+        "updatedAt": "2026-10-27T05:31:49.625Z"
+      },
+      {
+        "_id": "6ae0374592a0a7731ff0bd08",
+        "tenantId": "6ae0374592a0a7731ff0bcfa",
+        "name": "Jeans Style",
+        "type": "pant",
+        "isActive": true,
+        "__v": 0,
+        "createdAt": "2026-10-27T05:31:49.625Z",
+        "updatedAt": "2026-10-27T05:31:49.625Z"
+      },
+      {
+        "_id": "6ae0374592a0a7731ff0bd09",
+        "tenantId": "6ae0374592a0a7731ff0bcfa",
+        "name": "Pencil Fit",
+        "type": "pant",
+        "isActive": true,
+        "__v": 0,
+        "createdAt": "2026-10-27T05:31:49.625Z",
+        "updatedAt": "2026-10-27T05:31:49.625Z"
+      },
+      {
+        "_id": "6ae0374592a0a7731ff0bd0a",
+        "tenantId": "6ae0374592a0a7731ff0bcfa",
+        "name": "Pleated",
+        "type": "pant",
+        "isActive": true,
+        "__v": 0,
+        "createdAt": "2026-10-27T05:31:49.625Z",
+        "updatedAt": "2026-10-27T05:31:49.625Z"
+      },
+      {
+        "_id": "6ae0374592a0a7731ff0bd0b",
+        "tenantId": "6ae0374592a0a7731ff0bcfa",
+        "name": "Cotton Trouser",
+        "type": "pant",
+        "isActive": true,
+        "__v": 0,
+        "createdAt": "2026-10-27T05:31:49.625Z",
+        "updatedAt": "2026-10-27T05:31:49.625Z"
+      }
+    ],
+    "ordercounters": []
+  }
+}

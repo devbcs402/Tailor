@@ -95,6 +95,7 @@ export const login = async (req, res, next) => {
       success: true,
       message: 'Login successful',
       token,
+      mustChangePassword: Boolean(user.mustChangePassword),
       user: {
         id: user._id,
         name: user.name,
@@ -103,6 +104,7 @@ export const login = async (req, res, next) => {
         tenantId: user.tenantId,
         shopName: tenantData ? tenantData.businessName : user.shopName,
         tenant: tenantData,
+        mustChangePassword: Boolean(user.mustChangePassword),
       },
     });
   } catch (error) {
@@ -131,8 +133,117 @@ export const getMe = async (req, res) => {
       tenantId: req.user.tenantId,
       shopName: req.tenant ? req.tenant.businessName : req.user.shopName,
       tenant: tenantData,
+      mustChangePassword: Boolean(req.user.mustChangePassword),
     },
   });
+};
+
+/**
+ * Change password (Mandatory for first login, or user-initiated)
+ */
+export const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    if (!newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password is required',
+      });
+    }
+
+    if (newPassword.length < 12) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 12 characters long',
+      });
+    }
+
+    if (confirmPassword !== undefined && newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password and confirmation do not match',
+      });
+    }
+
+    // Complexity validation: uppercase, lowercase, and number
+    const hasUpper = /[A-Z]/.test(newPassword);
+    const hasLower = /[a-z]/.test(newPassword);
+    const hasNumber = /[0-9]/.test(newPassword);
+    if (!hasUpper || !hasLower || !hasNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must contain at least one uppercase letter, one lowercase letter, and one number',
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // If current password provided, verify it
+    if (currentPassword) {
+      const isMatch = await user.comparePassword(currentPassword);
+      if (!isMatch) {
+        return res.status(400).json({
+          success: false,
+          message: 'Current password is incorrect',
+        });
+      }
+    }
+
+    // Check if new password is identical to current password
+    const isSame = await user.comparePassword(newPassword);
+    if (isSame) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password cannot be identical to your current or initial password',
+      });
+    }
+
+    const passwordHash = await User.hashPassword(newPassword);
+    user.passwordHash = passwordHash;
+    user.mustChangePassword = false;
+    await user.save();
+
+    // Issue fresh JWT session token
+    const freshToken = generateToken(user._id);
+
+    // Record Audit Log
+    try {
+      await AuditLog.create({
+        actor: user._id,
+        actorEmail: user.email,
+        actorRole: user.role,
+        action: 'password_changed',
+        targetTenant: user.tenantId || null,
+        targetTenantName: user.shopName || '',
+        details: { reason: 'Password change completed successfully' },
+        ipAddress: req.ip || '',
+        userAgent: req.headers['user-agent'] || '',
+      });
+    } catch (auditErr) {
+      console.warn('[Audit Warning] Could not record password change audit:', auditErr.message);
+    }
+
+    return res.json({
+      success: true,
+      message: 'Password changed successfully! You may now access your tailoring dashboard.',
+      token: freshToken,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        tenantId: user.tenantId,
+        shopName: user.shopName,
+        mustChangePassword: false,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const logout = async (req, res) => {

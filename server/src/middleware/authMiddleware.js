@@ -56,6 +56,24 @@ export const requireAuth = async (req, res, next) => {
     }
 
     req.user = user;
+
+    // Enforce mandatory password change for users flagged with mustChangePassword: true
+    if (user.mustChangePassword) {
+      const reqPath = req.originalUrl || req.url || '';
+      const isAllowedAuthPath =
+        reqPath.includes('/api/auth/change-password') ||
+        reqPath.includes('/api/auth/logout') ||
+        reqPath.includes('/api/auth/me');
+
+      if (!isAllowedAuthPath) {
+        return res.status(403).json({
+          success: false,
+          code: 'MUST_CHANGE_PASSWORD',
+          message: 'You must change your initial password before accessing business operations.',
+        });
+      }
+    }
+
     next();
   } catch (error) {
     return res.status(401).json({

@@ -16,6 +16,9 @@ export const LoginPage = () => {
   const navigate = useNavigate();
 
   if (isAuthenticated) {
+    if (user?.mustChangePassword) {
+      return <Navigate to="/change-password" replace />;
+    }
     if (user?.role === 'platform_owner') {
       return <Navigate to="/owner/dashboard" replace />;
     }
@@ -38,6 +41,11 @@ export const LoginPage = () => {
     setLoading(true);
     try {
       const res = await login(email, password);
+      if (res?.user?.mustChangePassword) {
+        success('First login detected: Please update your initial password to proceed.');
+        navigate('/change-password');
+        return;
+      }
       success('Logged in successfully! Welcome.');
       if (res?.user?.role === 'platform_owner') {
         navigate('/owner/dashboard');

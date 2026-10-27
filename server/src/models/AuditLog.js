@@ -29,6 +29,7 @@ const auditLogSchema = new mongoose.Schema(
         'tenant_deleted',
         'tenant_admin_created',
         'tenant_admin_password_reset',
+        'password_changed',
         'platform_owner_login',
         'tenant_login',
       ],

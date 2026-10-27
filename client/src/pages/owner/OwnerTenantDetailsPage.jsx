@@ -22,6 +22,9 @@ import {
   Trash2,
   RotateCcw,
   Archive,
+  KeyRound,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { ownerApi } from '../../api/ownerApi';
 import { EditTenantModal } from '../../components/owner/EditTenantModal';
@@ -39,6 +42,16 @@ export const OwnerTenantDetailsPage = () => {
 
   // Edit modal
   const [isEditOpen, setIsEditOpen] = useState(false);
+
+  // Reset admin password modal
+  const [resetPasswordModal, setResetPasswordModal] = useState({
+    isOpen: false,
+    tempPassword: '',
+    loading: false,
+    result: null,
+    error: '',
+    copied: false,
+  });
 
   // Confirm dialog state for Activate / Deactivate
   const [confirmDialog, setConfirmDialog] = useState({
@@ -113,6 +126,48 @@ export const OwnerTenantDetailsPage = () => {
       console.error('Action failed:', err);
       const errMsg = err.message || 'Failed to execute status change';
       setConfirmDialog((prev) => ({ ...prev, loading: false, error: errMsg }));
+    }
+  };
+
+  const handleResetAdminPassword = async (e) => {
+    e.preventDefault();
+    if (!tenant) return;
+    try {
+      setResetPasswordModal((prev) => ({ ...prev, loading: true, error: '' }));
+      const res = await ownerApi.resetTenantAdminPassword(tenant._id, {
+        newPassword: resetPasswordModal.tempPassword || undefined,
+      });
+      if (res?.success && res?.data) {
+        setResetPasswordModal((prev) => ({
+          ...prev,
+          loading: false,
+          result: res.data,
+        }));
+        setSuccessMessage(`Password reset successfully for ${res.data.adminEmail}.`);
+        setTimeout(() => setSuccessMessage(''), 6000);
+      } else {
+        setResetPasswordModal((prev) => ({
+          ...prev,
+          loading: false,
+          error: res?.message || 'Password reset failed',
+        }));
+      }
+    } catch (err) {
+      setResetPasswordModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: err.message || 'Error communicating with server',
+      }));
+    }
+  };
+
+  const handleCopyPassword = () => {
+    if (resetPasswordModal.result?.temporaryPassword) {
+      navigator.clipboard.writeText(resetPasswordModal.result.temporaryPassword);
+      setResetPasswordModal((prev) => ({ ...prev, copied: true }));
+      setTimeout(() => {
+        setResetPasswordModal((prev) => ({ ...prev, copied: false }));
+      }, 3000);
     }
   };
 
@@ -336,6 +391,32 @@ export const OwnerTenantDetailsPage = () => {
               Archive Tenant
             </button>
           )}
+
+          {/* Reset Admin Password Action */}
+          <button
+            onClick={() =>
+              setResetPasswordModal({
+                isOpen: true,
+                tempPassword: '',
+                loading: false,
+                result: null,
+                error: '',
+                copied: false,
+              })
+            }
+            className="btn btn-outline"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              borderColor: '#d4af37',
+              color: '#b45309',
+              backgroundColor: '#fffbeb',
+            }}
+          >
+            <KeyRound size={16} />
+            Reset Admin Password
+          </button>
 
           {/* Dedicated Permanent Delete Action */}
           <button
@@ -873,6 +954,204 @@ export const OwnerTenantDetailsPage = () => {
         onConfirm={handleConfirmAction}
         onClose={() => !confirmDialog.loading && setConfirmDialog({ isOpen: false, type: 'deactivate', loading: false, reason: '', error: '' })}
       />
+
+      {/* Reset Admin Password Modal */}
+      {resetPasswordModal.isOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(11, 31, 58, 0.7)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1200,
+            padding: '16px',
+          }}
+        >
+          <div
+            className="card"
+            style={{
+              width: '100%',
+              maxWidth: '480px',
+              padding: '28px',
+              borderRadius: '16px',
+              backgroundColor: '#ffffff',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+              border: '1px solid #e2e8f0',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+              <div
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '10px',
+                  backgroundColor: '#fef3c7',
+                  color: '#b45309',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <KeyRound size={20} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0b1f3a', margin: 0 }}>
+                  Reset Admin Password
+                </h3>
+                <span style={{ fontSize: '0.84rem', color: '#64748b' }}>
+                  {tenant.businessName}
+                </span>
+              </div>
+            </div>
+
+            {resetPasswordModal.result ? (
+              <div>
+                <div
+                  style={{
+                    padding: '14px 16px',
+                    backgroundColor: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '10px',
+                    marginBottom: '18px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#16a34a', fontWeight: 700, fontSize: '0.92rem' }}>
+                    <CheckCircle2 size={18} /> Password Reset Successful!
+                  </div>
+                  <p style={{ fontSize: '0.86rem', color: '#334155', marginTop: '6px', margin: '6px 0 0 0' }}>
+                    A new temporary credential was generated for <strong>{resetPasswordModal.result.adminEmail}</strong>.
+                  </p>
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#64748b', marginBottom: '6px' }}>
+                    New Temporary Password:
+                  </label>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: '#f8fafc',
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      fontFamily: 'monospace',
+                      fontSize: '1.1rem',
+                      fontWeight: 700,
+                      color: '#0b1f3a',
+                    }}
+                  >
+                    <span>{resetPasswordModal.result.temporaryPassword}</span>
+                    <button
+                      type="button"
+                      onClick={handleCopyPassword}
+                      className="btn btn-outline btn-sm"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}
+                    >
+                      {resetPasswordModal.copied ? <Check size={14} color="#16a34a" /> : <Copy size={14} />}
+                      {resetPasswordModal.copied ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: '10px 14px',
+                    backgroundColor: '#fffbeb',
+                    borderRadius: '8px',
+                    border: '1px solid #fef3c7',
+                    fontSize: '0.82rem',
+                    color: '#92400e',
+                    marginBottom: '20px',
+                  }}
+                >
+                  ⚠️ The tenant administrator will be <strong>forced to set a new password</strong> on their very next login.
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    onClick={() => setResetPasswordModal({ isOpen: false, tempPassword: '', loading: false, result: null, error: '', copied: false })}
+                    className="btn btn-primary"
+                    style={{ backgroundColor: '#0b1f3a', color: '#d4af37' }}
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleResetAdminPassword}>
+                <p style={{ fontSize: '0.88rem', color: '#64748b', marginBottom: '16px', lineHeight: 1.45 }}>
+                  This will override the current password for the administrator of <strong>{tenant.businessName}</strong> and force them to change it on their next login.
+                </p>
+
+                {resetPasswordModal.error && (
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      backgroundColor: '#fee2e2',
+                      border: '1px solid #fecaca',
+                      color: '#991b1b',
+                      borderRadius: '8px',
+                      fontSize: '0.85rem',
+                      marginBottom: '14px',
+                    }}
+                  >
+                    {resetPasswordModal.error}
+                  </div>
+                )}
+
+                <div style={{ marginBottom: '18px' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                    Specify Custom Temporary Password (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={resetPasswordModal.tempPassword}
+                    onChange={(e) => setResetPasswordModal((prev) => ({ ...prev, tempPassword: e.target.value }))}
+                    placeholder="Leave blank to auto-generate a secure password"
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.9rem',
+                      outline: 'none',
+                      backgroundColor: '#f8fafc',
+                    }}
+                  />
+                  <span style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '4px', display: 'block' }}>
+                    If left blank, a high-entropy 14-character temporary password will be created automatically.
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setResetPasswordModal({ isOpen: false, tempPassword: '', loading: false, result: null, error: '', copied: false })}
+                    disabled={resetPasswordModal.loading}
+                    className="btn btn-outline btn-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={resetPasswordModal.loading}
+                    className="btn btn-primary btn-sm"
+                    style={{ backgroundColor: '#0b1f3a', color: '#d4af37' }}
+                  >
+                    {resetPasswordModal.loading ? 'Resetting...' : 'Confirm Reset Password'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

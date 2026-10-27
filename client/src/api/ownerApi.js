@@ -14,6 +14,7 @@ export const ownerApi = {
   archiveTenant: (id, reason = '') => api.post(`/owner/tenants/${id}/archive`, { reason }),
   deleteTenant: (id, reason = '') => api.delete(`/owner/tenants/${id}`),
   restoreTenant: (id) => api.post(`/owner/tenants/${id}/restore`, {}),
+  resetTenantAdminPassword: (id, data = {}) => api.post(`/owner/tenants/${id}/reset-password`, data),
   getActivityLogs: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     return api.get(`/owner/activity-logs?${query}`);
