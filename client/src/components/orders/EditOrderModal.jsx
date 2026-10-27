@@ -4,7 +4,7 @@ import { ShirtMeasurements } from './ShirtMeasurements';
 import { PantMeasurements } from './PantMeasurements';
 import { ordersApi } from '../../api/ordersApi';
 import { useToast } from '../../context/ToastContext';
-import { REQUIRED_SHIRT_FIELDS, REQUIRED_PANT_FIELDS, getFieldValue } from '../../utils/measurementLabels';
+import { getFieldValue } from '../../utils/measurementLabels';
 import { useTenantMeasurements } from '../../hooks/useTenantMeasurements';
 
 export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
@@ -113,26 +113,11 @@ export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
             }
           }
         }
-        for (const [key, val] of Object.entries(shirtMeasurements)) {
-          if (key !== 'notes' && key !== '_id' && !key.startsWith('$') && !key.startsWith('_') && val !== undefined && val !== null && String(val).trim() !== '') {
-            const def = shirtDefinitions.find((d) => d.fieldKey === key);
-            if (!def || def.fieldType === 'number') {
-              const num = parseFloat(val);
-              if (isNaN(num) || num <= 0) {
-                newShirtErrors[key] = 'Must be > 0';
-              }
-            }
-          }
-        }
-      } else {
-        for (const field of REQUIRED_SHIRT_FIELDS) {
-          const val = getFieldValue(shirtMeasurements, field);
-          if (val === undefined || val === null || String(val).trim() === '') {
-            newShirtErrors[field] = 'Required';
-          }
-        }
-        for (const [key, val] of Object.entries(shirtMeasurements)) {
-          if (key !== 'notes' && !key.startsWith('$') && !key.startsWith('_') && val !== undefined && val !== null && String(val).trim() !== '') {
+      }
+      for (const [key, val] of Object.entries(shirtMeasurements)) {
+        if (key !== 'notes' && key !== '_id' && !key.startsWith('$') && !key.startsWith('_') && val !== undefined && val !== null && String(val).trim() !== '') {
+          const def = (shirtDefinitions || []).find((d) => d.fieldKey === key);
+          if (!def || def.fieldType === 'number') {
             const num = parseFloat(val);
             if (isNaN(num) || num <= 0) {
               newShirtErrors[key] = 'Must be > 0';
@@ -152,26 +137,11 @@ export const EditOrderModal = ({ isOpen, onClose, order, onOrderUpdated }) => {
             }
           }
         }
-        for (const [key, val] of Object.entries(pantMeasurements)) {
-          if (key !== 'notes' && key !== '_id' && !key.startsWith('$') && !key.startsWith('_') && val !== undefined && val !== null && String(val).trim() !== '') {
-            const def = pantDefinitions.find((d) => d.fieldKey === key);
-            if (!def || def.fieldType === 'number') {
-              const num = parseFloat(val);
-              if (isNaN(num) || num <= 0) {
-                newPantErrors[key] = 'Must be > 0';
-              }
-            }
-          }
-        }
-      } else {
-        for (const field of REQUIRED_PANT_FIELDS) {
-          const val = getFieldValue(pantMeasurements, field);
-          if (val === undefined || val === null || String(val).trim() === '') {
-            newPantErrors[field] = 'Required';
-          }
-        }
-        for (const [key, val] of Object.entries(pantMeasurements)) {
-          if (key !== 'notes' && !key.startsWith('$') && !key.startsWith('_') && val !== undefined && val !== null && String(val).trim() !== '') {
+      }
+      for (const [key, val] of Object.entries(pantMeasurements)) {
+        if (key !== 'notes' && key !== '_id' && !key.startsWith('$') && !key.startsWith('_') && val !== undefined && val !== null && String(val).trim() !== '') {
+          const def = (pantDefinitions || []).find((d) => d.fieldKey === key);
+          if (!def || def.fieldType === 'number') {
             const num = parseFloat(val);
             if (isNaN(num) || num <= 0) {
               newPantErrors[key] = 'Must be > 0';

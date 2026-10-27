@@ -75,44 +75,39 @@ const toPlainObj = (obj) => {
 
 export const validateMeasurementsWithDefinitions = (rawMeasurements = {}, definitions = [], garmentName) => {
   const measurements = toPlainObj(rawMeasurements);
-  if (definitions && definitions.length > 0) {
-    const defMap = new Map(definitions.map((d) => [d.fieldKey, d]));
+  const defs = definitions || [];
+  const defMap = new Map(defs.map((d) => [d.fieldKey, d]));
 
-    // Check required definitions
-    for (const def of definitions) {
-      if (def.isActive && def.isRequired) {
-        const val = getMeasurementVal(measurements, def.fieldKey);
-        if (val === undefined || val === null || String(val).trim() === '') {
-          return `Required ${garmentName} measurement "${def.displayName}" is missing.`;
-        }
+  // Check required definitions (only if definitions are configured)
+  for (const def of defs) {
+    if (def.isActive && def.isRequired) {
+      const val = getMeasurementVal(measurements, def.fieldKey);
+      if (val === undefined || val === null || String(val).trim() === '') {
+        return `Required ${garmentName} measurement "${def.displayName}" is missing.`;
       }
     }
-
-    // Validate types for all entered values
-    for (const [key, val] of Object.entries(measurements)) {
-      if (key.startsWith('$') || key.startsWith('_') || key === 'notes' || key === 'isNew') {
-        continue;
-      }
-      if (val !== undefined && val !== null && String(val).trim() !== '') {
-        const def = defMap.get(key) || definitions.find((d) => normalizeKey(d.fieldKey) === normalizeKey(key));
-        if (def && def.fieldType === 'text') {
-          continue;
-        }
-        if (!def || def.fieldType === 'number') {
-          const num = parseFloat(val);
-          if (isNaN(num) || num <= 0) {
-            const label = def ? def.displayName : key;
-            return `${garmentName.charAt(0).toUpperCase() + garmentName.slice(1)} measurement "${label}" must be a valid positive number.`;
-          }
-        }
-      }
-    }
-    return null;
   }
 
-  // Fallback if no definitions exist
-  const defaultRequired = garmentName === 'shirt' ? REQUIRED_SHIRT_FIELDS : REQUIRED_PANT_FIELDS;
-  return validateGarmentMeasurements(measurements, defaultRequired, garmentName);
+  // Validate types for all entered values
+  for (const [key, val] of Object.entries(measurements)) {
+    if (key.startsWith('$') || key.startsWith('_') || key === 'notes' || key === 'isNew') {
+      continue;
+    }
+    if (val !== undefined && val !== null && String(val).trim() !== '') {
+      const def = defMap.get(key) || defs.find((d) => normalizeKey(d.fieldKey) === normalizeKey(key));
+      if (def && def.fieldType === 'text') {
+        continue;
+      }
+      if (!def || def.fieldType === 'number') {
+        const num = parseFloat(val);
+        if (isNaN(num) || num <= 0) {
+          const label = def ? def.displayName : key;
+          return `${garmentName.charAt(0).toUpperCase() + garmentName.slice(1)} measurement "${label}" must be a valid positive number.`;
+        }
+      }
+    }
+  }
+  return null;
 };
 
 export const buildMeasurementSnapshot = (rawMeasurements = {}, definitions = []) => {
@@ -328,8 +323,8 @@ export const createOrder = async (req, res, next) => {
       });
     }
 
-    // Fetch active definitions for this tenant
-    const tenantDefinitions = await MeasurementDefinition.find({ tenantId, isActive: true }).lean();
+    // Fetch active definitions for this tenant (excluding deleted)
+    const tenantDefinitions = await MeasurementDefinition.find({ tenantId, isActive: true, isDeleted: { $ne: true } }).lean();
     const shirtDefs = tenantDefinitions.filter((d) => d.category === 'shirt_measurement');
     const pantDefs = tenantDefinitions.filter((d) => d.category === 'pant_measurement');
 
@@ -731,7 +726,7 @@ export const updateOrder = async (req, res, next) => {
       });
     }
 
-    const tenantDefinitions = await MeasurementDefinition.find({ tenantId, isActive: true }).lean();
+    const tenantDefinitions = await MeasurementDefinition.find({ tenantId, isActive: true, isDeleted: { $ne: true } }).lean();
     const shirtDefs = tenantDefinitions.filter((d) => d.category === 'shirt_measurement');
     const pantDefs = tenantDefinitions.filter((d) => d.category === 'pant_measurement');
 

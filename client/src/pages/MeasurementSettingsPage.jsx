@@ -226,6 +226,7 @@ export const MeasurementSettingsPage = () => {
   // -----------------------------------------------------------------
   const handleSaveModal = async (e) => {
     e.preventDefault();
+    if (savingDef) return;
     setModalError('');
 
     if (!modalFormData.displayName || !modalFormData.displayName.trim()) {
@@ -281,6 +282,7 @@ export const MeasurementSettingsPage = () => {
   };
 
   const executeToggleStatus = async (def, newStatus) => {
+    if (togglingStatus) return;
     setTogglingStatus(true);
     try {
       const res = await measurementDefinitionsApi.toggleStatus(def._id, newStatus);
@@ -299,7 +301,7 @@ export const MeasurementSettingsPage = () => {
   // Delete Measurement Definition
   // -----------------------------------------------------------------
   const handleDeleteMeasurement = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || deletingMeasurement) return;
     setDeletingMeasurement(true);
     try {
       const res = await measurementDefinitionsApi.deleteDefinition(deleteTarget._id);
@@ -355,6 +357,7 @@ export const MeasurementSettingsPage = () => {
   // -----------------------------------------------------------------
   const handleAddPattern = async (e) => {
     e.preventDefault();
+    if (addingPattern) return;
     const clean = newPatternName.trim();
     if (!clean) return;
 
@@ -382,6 +385,7 @@ export const MeasurementSettingsPage = () => {
   };
 
   const handleSavePatternEdit = async (pattern) => {
+    if (savingPatternEdit) return;
     const clean = editingPatternName.trim();
     if (!clean) return;
 
@@ -401,7 +405,7 @@ export const MeasurementSettingsPage = () => {
   };
 
   const handleDeletePattern = async () => {
-    if (!deletePatternTarget) return;
+    if (!deletePatternTarget || deletingPattern) return;
     setDeletingPattern(true);
     try {
       await patternsApi.deletePattern(deletePatternTarget._id);

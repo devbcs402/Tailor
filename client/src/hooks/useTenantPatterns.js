@@ -4,13 +4,19 @@ import { patternsApi } from '../api/patternsApi';
 // In-memory cache for patterns
 let cachedShirtPatterns = null;
 let cachedPantPatterns = null;
-let lastPatternFetchTime = 0;
+let lastShirtPatternFetchTime = 0;
+let lastPantPatternFetchTime = 0;
+let inFlightShirtPatternPromise = null;
+let inFlightPantPatternPromise = null;
 const PATTERN_CACHE_TTL_MS = 60000; // 1 minute
 
 export const clearPatternsCache = () => {
   cachedShirtPatterns = null;
   cachedPantPatterns = null;
-  lastPatternFetchTime = 0;
+  lastShirtPatternFetchTime = 0;
+  lastPantPatternFetchTime = 0;
+  inFlightShirtPatternPromise = null;
+  inFlightPantPatternPromise = null;
 };
 
 /**
@@ -45,29 +51,62 @@ export const useTenantPatterns = (garmentType = 'shirt') => {
   const fetchPatterns = useCallback(async (force = false) => {
     const now = Date.now();
     const currentCache = garmentType === 'shirt' ? cachedShirtPatterns : cachedPantPatterns;
-    if (!force && currentCache && (now - lastPatternFetchTime < PATTERN_CACHE_TTL_MS)) {
+    const lastFetch = garmentType === 'shirt' ? lastShirtPatternFetchTime : lastPantPatternFetchTime;
+
+    if (!force && currentCache && (now - lastFetch < PATTERN_CACHE_TTL_MS)) {
       setPatterns(currentCache);
       setLoading(false);
       return;
     }
 
+    const inFlightPromise = garmentType === 'shirt' ? inFlightShirtPatternPromise : inFlightPantPatternPromise;
+    if (!force && inFlightPromise) {
+      try {
+        setLoading(true);
+        const shared = await inFlightPromise;
+        setPatterns(shared);
+        setLoading(false);
+        return;
+      } catch (err) {
+        // Fall through on error
+      }
+    }
+
     try {
       setLoading(true);
       setError(null);
-      const res = await patternsApi.getPatterns({ type: garmentType });
-      const data = res.data && Array.isArray(res.data) ? res.data : [];
+
+      const promise = (async () => {
+        const res = await patternsApi.getPatterns({ type: garmentType });
+        const data = res.data && Array.isArray(res.data) ? res.data : [];
+        if (garmentType === 'shirt') {
+          cachedShirtPatterns = data;
+          lastShirtPatternFetchTime = Date.now();
+        } else {
+          cachedPantPatterns = data;
+          lastPantPatternFetchTime = Date.now();
+        }
+        return data;
+      })();
+
       if (garmentType === 'shirt') {
-        cachedShirtPatterns = data;
+        inFlightShirtPatternPromise = promise;
       } else {
-        cachedPantPatterns = data;
+        inFlightPantPatternPromise = promise;
       }
-      lastPatternFetchTime = now;
+
+      const data = await promise;
       setPatterns(data);
     } catch (err) {
       console.warn(`[useTenantPatterns] Failed to load ${garmentType} patterns:`, err.message);
       setError(err);
       setPatterns([]);
     } finally {
+      if (garmentType === 'shirt') {
+        inFlightShirtPatternPromise = null;
+      } else {
+        inFlightPantPatternPromise = null;
+      }
       setLoading(false);
     }
   }, [garmentType]);

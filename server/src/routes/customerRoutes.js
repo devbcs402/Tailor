@@ -7,11 +7,12 @@ import {
   updateCustomerMeasurements,
   getCustomerOrders,
 } from '../controllers/customerController.js';
-import { requireAuth } from '../middleware/authMiddleware.js';
+import { requireAuth, requireTenant } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 router.use(requireAuth);
+router.use(requireTenant);
 
 router.get('/', getCustomers);
 router.post('/', createCustomer);

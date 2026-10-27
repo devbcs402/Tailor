@@ -17,7 +17,7 @@ import { Loading } from '../components/common/Loading';
 import { ErrorMessage } from '../components/common/ErrorMessage';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { formatDate, getDeadlineStatus } from '../utils/dateUtils';
-import { SHIRT_FIELDS, PANT_FIELDS, getFieldValue } from '../utils/measurementLabels';
+import { getFieldValue } from '../utils/measurementLabels';
 import { getShirtPatternLabel, getPantPatternLabel } from '../utils/patternOptions';
 import { StatusChangeModal } from '../components/orders/StatusChangeModal';
 import { OrderPrintSlip } from '../components/orders/OrderPrintSlip';
@@ -105,9 +105,7 @@ export const OrderDetailsPage = () => {
     }
 
     const measurements = rawMeasurements || {};
-    const baseDefs = (definitions && definitions.length > 0)
-      ? definitions
-      : SHIRT_FIELDS.map((f) => ({ fieldKey: f.key, displayName: f.label, gujaratiName: f.gujaratiLabel }));
+    const baseDefs = Array.isArray(definitions) ? definitions : [];
     const defKeys = new Set(baseDefs.map((d) => d.fieldKey));
 
     const fields = baseDefs.map((d) => ({
@@ -315,18 +313,24 @@ export const OrderDetailsPage = () => {
             </span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
-            {shirtDisplayFields.map((f) => (
-              <div key={f.key} style={{ padding: '8px 10px', borderRadius: '8px', backgroundColor: '#f8fafc', border: '1px solid var(--border-light)' }}>
-                <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                  {f.label} {f.gujaratiLabel ? `(${f.gujaratiLabel})` : ''}
+          {shirtDisplayFields.length === 0 ? (
+            <div style={{ padding: '12px 14px', backgroundColor: '#f8fafc', borderRadius: '6px', color: '#64748b', fontSize: '0.86rem', fontStyle: 'italic' }}>
+              No shirt measurements recorded for this order.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
+              {shirtDisplayFields.map((f) => (
+                <div key={f.key} style={{ padding: '8px 10px', borderRadius: '8px', backgroundColor: '#f8fafc', border: '1px solid var(--border-light)' }}>
+                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    {f.label} {f.gujaratiLabel ? `(${f.gujaratiLabel})` : ''}
+                  </div>
+                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
+                    {f.value || '-'}
+                  </div>
                 </div>
-                <div style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
-                  {f.value || '-'}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           {order.shirt?.measurements?.notes && (
             <div style={{ marginTop: '14px', fontSize: '0.85rem', color: '#475569', background: '#fffbeb', padding: '8px 12px', borderRadius: '6px', border: '1px solid #fef3c7' }}>
@@ -346,18 +350,24 @@ export const OrderDetailsPage = () => {
             </span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
-            {pantDisplayFields.map((f) => (
-              <div key={f.key} style={{ padding: '8px 10px', borderRadius: '8px', backgroundColor: '#f8fafc', border: '1px solid var(--border-light)' }}>
-                <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                  {f.label} {f.gujaratiLabel ? `(${f.gujaratiLabel})` : ''}
+          {pantDisplayFields.length === 0 ? (
+            <div style={{ padding: '12px 14px', backgroundColor: '#f8fafc', borderRadius: '6px', color: '#64748b', fontSize: '0.86rem', fontStyle: 'italic' }}>
+              No pant measurements recorded for this order.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
+              {pantDisplayFields.map((f) => (
+                <div key={f.key} style={{ padding: '8px 10px', borderRadius: '8px', backgroundColor: '#f8fafc', border: '1px solid var(--border-light)' }}>
+                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    {f.label} {f.gujaratiLabel ? `(${f.gujaratiLabel})` : ''}
+                  </div>
+                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
+                    {f.value || '-'}
+                  </div>
                 </div>
-                <div style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
-                  {f.value || '-'}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           {order.pant?.measurements?.notes && (
             <div style={{ marginTop: '14px', fontSize: '0.85rem', color: '#475569', background: '#fffbeb', padding: '8px 12px', borderRadius: '6px', border: '1px solid #fef3c7' }}>

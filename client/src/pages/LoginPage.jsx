@@ -120,11 +120,27 @@ export const LoginPage = () => {
               marginBottom: '20px',
               border: '1px solid #fecaca',
               display: 'flex',
-              alignItems: 'center',
+              flexDirection: 'column',
               gap: '8px',
             }}
           >
             <span>{error}</span>
+            {(error.includes('/owner/login') || error.includes('Platform Owner')) && (
+              <a
+                href="/owner/login"
+                style={{
+                  color: '#b45309',
+                  fontWeight: 700,
+                  textDecoration: 'underline',
+                  fontSize: '0.86rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                Go to Platform Owner Login &rarr;
+              </a>
+            )}
           </div>
         )}
 

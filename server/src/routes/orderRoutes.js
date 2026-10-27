@@ -7,11 +7,12 @@ import {
   updateOrderStatus,
   deleteOrder,
 } from '../controllers/orderController.js';
-import { requireAuth } from '../middleware/authMiddleware.js';
+import { requireAuth, requireTenant } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 router.use(requireAuth);
+router.use(requireTenant);
 
 router.get('/', getOrders);
 router.post('/', createOrder);

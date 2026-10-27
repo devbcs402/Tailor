@@ -20,9 +20,12 @@ export const PantMeasurements = ({
   // Use pattern hook for real-time synchronized pattern definitions
   const { patternNames: availablePatterns, loading: loadingPatterns } = useTenantPatterns('pant');
 
-  // Use hook to fetch tenant's definitions if not provided by parent
-  const { pantDefinitions: hookDefinitions, loading: loadingDefs } = useTenantMeasurements();
-  const baseDefinitions = propDefinitions || hookDefinitions || [];
+  // Use hook to fetch tenant's definitions only if not provided by parent
+  const hasPropDefinitions = propDefinitions !== undefined;
+  const { pantDefinitions: hookDefinitions, loading: loadingDefs, error: errorDefs } = useTenantMeasurements({
+    enabled: !hasPropDefinitions,
+  });
+  const baseDefinitions = hasPropDefinitions ? propDefinitions : (hookDefinitions || []);
 
   const numQty = parseInt(quantity, 10);
   const isAvailable = !isNaN(numQty) && numQty > 0;
@@ -226,77 +229,122 @@ export const PantMeasurements = ({
         </div>
       </div>
 
-      {/* Dynamic Measurement Fields Grid */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-          gap: '12px',
-        }}
-      >
-        {allFieldsToRender.map((f) => {
-          const hasError = Boolean(errors && errors[f.fieldKey]);
-          const fieldType = f.fieldType || 'number';
+      {/* Loading state for measurement fields */}
+      {loadingDefs && !propDefinitions && (
+        <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+          Loading pant measurement definitions...
+        </div>
+      )}
 
-          return (
-            <div
-              key={f.fieldKey}
-              className="measure-input-card"
-              style={{
-                backgroundColor: isAvailable ? '#ffffff' : '#f8fafc',
-                borderColor: hasError ? '#dc2626' : (isAvailable ? 'var(--border-light)' : '#e2e8f0'),
-                borderWidth: hasError ? '1.5px' : '1px',
-                opacity: isAvailable ? 1 : 0.7,
-                position: 'relative',
-              }}
-            >
-              <div className="measure-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: hasError ? '#dc2626' : (isAvailable ? '#475569' : '#94a3b8'), fontWeight: 600, fontSize: '0.84rem' }}>
-                  {f.displayName}{' '}
-                  {f.gujaratiName && (
-                    <span style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 500 }}>
-                      ({f.gujaratiName})
+      {/* API error state */}
+      {errorDefs && !propDefinitions && !loadingDefs && (
+        <div
+          role="alert"
+          style={{
+            padding: '12px 16px',
+            backgroundColor: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: '8px',
+            color: '#991b1b',
+            fontSize: '0.88rem',
+            marginBottom: '16px',
+          }}
+        >
+          Failed to load pant measurement definitions. Please refresh or check connection.
+        </div>
+      )}
+
+      {/* Zero definitions empty state */}
+      {!loadingDefs && !errorDefs && allFieldsToRender.length === 0 && (
+        <div
+          style={{
+            padding: '16px 20px',
+            backgroundColor: '#f8fafc',
+            border: '1px dashed #cbd5e1',
+            borderRadius: '8px',
+            color: '#64748b',
+            fontSize: '0.9rem',
+            textAlign: 'center',
+            margin: '8px 0 16px 0',
+          }}
+        >
+          No pant measurements configured. Add measurements in Measurement & Pattern Settings to use them in orders.
+        </div>
+      )}
+
+      {/* Dynamic Measurement Fields Grid */}
+      {allFieldsToRender.length > 0 && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+            gap: '12px',
+          }}
+        >
+          {allFieldsToRender.map((f) => {
+            const hasError = Boolean(errors && errors[f.fieldKey]);
+            const fieldType = f.fieldType || 'number';
+
+            return (
+              <div
+                key={f.fieldKey}
+                className="measure-input-card"
+                style={{
+                  backgroundColor: isAvailable ? '#ffffff' : '#f8fafc',
+                  borderColor: hasError ? '#dc2626' : (isAvailable ? 'var(--border-light)' : '#e2e8f0'),
+                  borderWidth: hasError ? '1.5px' : '1px',
+                  opacity: isAvailable ? 1 : 0.7,
+                  position: 'relative',
+                }}
+              >
+                <div className="measure-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: hasError ? '#dc2626' : (isAvailable ? '#475569' : '#94a3b8'), fontWeight: 600, fontSize: '0.84rem' }}>
+                    {f.displayName}{' '}
+                    {f.gujaratiName && (
+                      <span style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 500 }}>
+                        ({f.gujaratiName})
+                      </span>
+                    )}
+                    {f.isRequired && isAvailable && <span style={{ color: '#dc2626', fontWeight: 800 }}> *</span>}
+                  </span>
+
+                  {f.isHistorical && (
+                    <span
+                      title="Historical field preserved from previous order or profile"
+                      style={{ fontSize: '0.68rem', padding: '1px 4px', backgroundColor: '#fef3c7', color: '#92400e', borderRadius: '4px' }}
+                    >
+                      Historical
                     </span>
                   )}
-                  {f.isRequired && isAvailable && <span style={{ color: '#dc2626', fontWeight: 800 }}> *</span>}
-                </span>
+                </div>
 
-                {f.isHistorical && (
-                  <span
-                    title="Historical field preserved from previous order or profile"
-                    style={{ fontSize: '0.68rem', padding: '1px 4px', backgroundColor: '#fef3c7', color: '#92400e', borderRadius: '4px' }}
-                  >
-                    Historical
+                <input
+                  type="text"
+                  inputMode={fieldType === 'number' ? 'decimal' : 'text'}
+                  className="form-control"
+                  placeholder={isAvailable ? (fieldType === 'number' ? 'e.g. 38' : 'Value') : '—'}
+                  value={isAvailable ? getFieldValue(measurements, f.fieldKey) : ''}
+                  onChange={(e) => handleFieldChange(f.fieldKey, e.target.value, fieldType)}
+                  disabled={!isAvailable}
+                  style={{
+                    fontWeight: 600,
+                    fontSize: '1rem',
+                    padding: '6px 10px',
+                    backgroundColor: isAvailable ? '#ffffff' : '#f1f5f9',
+                    borderColor: hasError ? '#dc2626' : undefined,
+                    cursor: isAvailable ? 'text' : 'not-allowed',
+                  }}
+                />
+                {hasError && (
+                  <span style={{ color: '#dc2626', fontSize: '0.73rem', marginTop: '4px', display: 'block', fontWeight: 600 }}>
+                    {errors[f.fieldKey]}
                   </span>
                 )}
               </div>
-
-              <input
-                type="text"
-                inputMode={fieldType === 'number' ? 'decimal' : 'text'}
-                className="form-control"
-                placeholder={isAvailable ? (fieldType === 'number' ? 'e.g. 38' : 'Value') : '—'}
-                value={isAvailable ? getFieldValue(measurements, f.fieldKey) : ''}
-                onChange={(e) => handleFieldChange(f.fieldKey, e.target.value, fieldType)}
-                disabled={!isAvailable}
-                style={{
-                  fontWeight: 600,
-                  fontSize: '1rem',
-                  padding: '6px 10px',
-                  backgroundColor: isAvailable ? '#ffffff' : '#f1f5f9',
-                  borderColor: hasError ? '#dc2626' : undefined,
-                  cursor: isAvailable ? 'text' : 'not-allowed',
-                }}
-              />
-              {hasError && (
-                <span style={{ color: '#dc2626', fontSize: '0.73rem', marginTop: '4px', display: 'block', fontWeight: 600 }}>
-                  {errors[f.fieldKey]}
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Pant Special Notes */}
       <div style={{ marginTop: '16px' }}>

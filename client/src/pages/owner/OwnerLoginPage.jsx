@@ -10,7 +10,7 @@ export const OwnerLoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const { login, logout } = useAuth();
+  const { ownerLogin } = useAuth();
   const { success, error: toastError } = useToast();
   const navigate = useNavigate();
 
@@ -25,14 +25,7 @@ export const OwnerLoginPage = () => {
 
     setLoading(true);
     try {
-      const res = await login(email.trim(), password);
-      if (res.user?.role !== 'platform_owner') {
-        await logout();
-        setError('Access denied: This portal is strictly reserved for the Platform Owner.');
-        toastError('Access denied: Platform owner credentials required.');
-        return;
-      }
-
+      const res = await ownerLogin(email.trim(), password);
       success('Welcome to Platform Administration Console');
       navigate('/owner/dashboard');
     } catch (err) {

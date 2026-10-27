@@ -4,8 +4,57 @@
 
 const BASE_URL = '/api';
 
+// In-flight GET request deduplication cache
+const inFlightGetRequests = new Map();
+
 export async function request(endpoint, options = {}) {
+  const method = (options.method || 'GET').toUpperCase();
   const token = localStorage.getItem('tailor_token');
+
+  // Coalesce identical in-flight GET requests to eliminate duplicate network calls
+  if (method === 'GET' && !options.noCache) {
+    const cacheKey = `${token || 'anon'}:${endpoint}`;
+    if (inFlightGetRequests.has(cacheKey)) {
+      return inFlightGetRequests.get(cacheKey);
+    }
+
+    const promise = (async () => {
+      try {
+        const headers = {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...options.headers,
+        };
+
+        const config = {
+          ...options,
+          headers,
+        };
+
+        const response = await fetch(`${BASE_URL}${endpoint}`, config);
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            localStorage.removeItem('tailor_token');
+            localStorage.removeItem('tailor_user');
+            window.dispatchEvent(new Event('tailor_auth_logout'));
+          }
+          const error = new Error(data.message || 'Server request failed');
+          error.status = response.status;
+          error.data = data;
+          throw error;
+        }
+
+        return data;
+      } finally {
+        inFlightGetRequests.delete(cacheKey);
+      }
+    })();
+
+    inFlightGetRequests.set(cacheKey, promise);
+    return promise;
+  }
 
   const headers = {
     'Content-Type': 'application/json',

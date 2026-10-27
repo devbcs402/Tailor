@@ -31,7 +31,7 @@ async function runTests() {
 
   // --- Step 1: Owner Login and Tenant Setup ---
   console.log('--- STEP 1: Platform Owner Login & Setup ---');
-  const ownerRes = await fetch(`${BASE_URL}/auth/login`, {
+  const ownerRes = await fetch(`${BASE_URL}/owner/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: 'owner@platform.com', password: 'Owner@Pass2026!' }),

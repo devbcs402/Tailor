@@ -63,7 +63,7 @@ async function runVerification() {
     // -----------------------------------------------------------------
     console.log('\n--- STEP 2: Platform Owner & Tenant Setup ---');
 
-    const ownerLoginRes = await fetch(`${BASE_URL}/auth/login`, {
+    const ownerLoginRes = await fetch(`${BASE_URL}/owner/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'owner@platform.com', password: 'Owner@Pass2026!' }),

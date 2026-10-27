@@ -919,3 +919,91 @@ export const getActivityLogs = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Helper to compute half-open calendar day bounds in Indian Standard Time (Asia/Kolkata, UTC+5:30)
+ * @param {string} dateStr YYYY-MM-DD
+ */
+export const getDayBoundsIST = (dateStr) => {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+  if (!match) return null;
+
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const day = parseInt(match[3], 10);
+
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+  const testDate = new Date(Date.UTC(year, month - 1, day));
+  if (
+    testDate.getUTCFullYear() !== year ||
+    testDate.getUTCMonth() !== month - 1 ||
+    testDate.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  // IST offset is UTC+5:30 (+19,800,000 ms)
+  const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
+  const startOfDayUTC = Date.UTC(year, month - 1, day, 0, 0, 0, 0) - IST_OFFSET_MS;
+  const endOfDayUTC = Date.UTC(year, month - 1, day + 1, 0, 0, 0, 0) - IST_OFFSET_MS;
+
+  return {
+    startOfDay: new Date(startOfDayUTC),
+    endOfDay: new Date(endOfDayUTC),
+    year,
+    month,
+    day,
+  };
+};
+
+/**
+ * Permanently delete activity logs for a specified calendar date in Asia/Kolkata timezone
+ */
+export const deleteActivityLogsByDate = async (req, res, next) => {
+  try {
+    const rawDate = req.query.date || req.body?.date;
+    if (!rawDate || typeof rawDate !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'A valid date parameter in YYYY-MM-DD format is required.',
+      });
+    }
+
+    const bounds = getDayBoundsIST(rawDate.trim());
+    if (!bounds) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid date provided. Please provide a valid calendar date in YYYY-MM-DD format.',
+      });
+    }
+
+    const { startOfDay, endOfDay, year, month, day } = bounds;
+
+    // Delete ONLY records from AuditLog whose createdAt falls within [startOfDay, endOfDay)
+    const result = await AuditLog.deleteMany({
+      createdAt: {
+        $gte: startOfDay,
+        $lt: endOfDay,
+      },
+    });
+
+    const formattedDate = new Date(Date.UTC(year, month - 1, day)).toLocaleDateString('en-GB', {
+      timeZone: 'UTC',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    return res.json({
+      success: true,
+      message: `Successfully deleted ${result.deletedCount} activity log(s) for ${formattedDate}.`,
+      deletedCount: result.deletedCount,
+      date: rawDate.trim(),
+      formattedDate,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

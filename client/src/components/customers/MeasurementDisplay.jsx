@@ -106,35 +106,41 @@ export const MeasurementDisplay = ({
             </span>
           </div>
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
-              gap: '10px',
-            }}
-          >
-            {displayShirtFields.map((f) => {
-              const val = getFieldValue(shirt, f.fieldKey);
-              return (
-                <div
-                  key={f.fieldKey}
-                  style={{
-                    padding: '8px 10px',
-                    borderRadius: '8px',
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid var(--border-light)',
-                  }}
-                >
-                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                    {f.displayName} {f.gujaratiName ? `(${f.gujaratiName})` : ''}
+          {displayShirtFields.length === 0 ? (
+            <div style={{ padding: '12px 14px', backgroundColor: '#f8fafc', borderRadius: '6px', color: '#64748b', fontSize: '0.86rem', fontStyle: 'italic' }}>
+              No shirt measurements recorded.
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+                gap: '10px',
+              }}
+            >
+              {displayShirtFields.map((f) => {
+                const val = getFieldValue(shirt, f.fieldKey);
+                return (
+                  <div
+                    key={f.fieldKey}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid var(--border-light)',
+                    }}
+                  >
+                    <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                      {f.displayName} {f.gujaratiName ? `(${f.gujaratiName})` : ''}
+                    </div>
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
+                      {val || '-'}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
-                    {val || '-'}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
 
           {shirt.notes && (
             <div style={{ marginTop: '14px', fontSize: '0.85rem', color: '#475569', background: '#fffbeb', padding: '8px 12px', borderRadius: '6px', border: '1px solid #fef3c7' }}>
@@ -163,35 +169,41 @@ export const MeasurementDisplay = ({
             </span>
           </div>
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
-              gap: '10px',
-            }}
-          >
-            {displayPantFields.map((f) => {
-              const val = getFieldValue(pant, f.fieldKey);
-              return (
-                <div
-                  key={f.fieldKey}
-                  style={{
-                    padding: '8px 10px',
-                    borderRadius: '8px',
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid var(--border-light)',
-                  }}
-                >
-                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                    {f.displayName} {f.gujaratiName ? `(${f.gujaratiName})` : ''}
+          {displayPantFields.length === 0 ? (
+            <div style={{ padding: '12px 14px', backgroundColor: '#f8fafc', borderRadius: '6px', color: '#64748b', fontSize: '0.86rem', fontStyle: 'italic' }}>
+              No pant measurements recorded.
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+                gap: '10px',
+              }}
+            >
+              {displayPantFields.map((f) => {
+                const val = getFieldValue(pant, f.fieldKey);
+                return (
+                  <div
+                    key={f.fieldKey}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid var(--border-light)',
+                    }}
+                  >
+                    <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                      {f.displayName} {f.gujaratiName ? `(${f.gujaratiName})` : ''}
+                    </div>
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
+                      {val || '-'}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
-                    {val || '-'}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
 
           {pant.notes && (
             <div style={{ marginTop: '14px', fontSize: '0.85rem', color: '#475569', background: '#fffbeb', padding: '8px 12px', borderRadius: '6px', border: '1px solid #fef3c7' }}>

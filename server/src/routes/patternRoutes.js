@@ -6,11 +6,12 @@ import {
   deletePattern,
   togglePatternStatus,
 } from '../controllers/patternController.js';
-import { requireAuth } from '../middleware/authMiddleware.js';
+import { requireAuth, requireTenant } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 router.use(requireAuth);
+router.use(requireTenant);
 
 router.get('/', getPatterns);
 router.post('/', createPattern);

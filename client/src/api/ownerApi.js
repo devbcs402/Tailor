@@ -19,4 +19,7 @@ export const ownerApi = {
     const query = new URLSearchParams(params).toString();
     return api.get(`/owner/activity-logs?${query}`);
   },
+  deleteActivityLogsByDate: (date) => {
+    return api.delete(`/owner/activity-logs?date=${encodeURIComponent(date)}`);
+  },
 };

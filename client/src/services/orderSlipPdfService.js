@@ -109,7 +109,7 @@ const resolvePdfFields = (category, measurements = {}, snapshotList = [], tenant
         });
       }
     });
-  } else if (!snapshotList || snapshotList.length === 0) {
+  } else if ((!snapshotList || snapshotList.length === 0) && !Array.isArray(tenantDefs)) {
     // Fallback to baseline fields if neither snapshot nor tenant definitions are available
     const baseFields = category === 'shirt' ? SHIRT_FIELDS : PANT_FIELDS;
     baseFields.forEach((f) => {

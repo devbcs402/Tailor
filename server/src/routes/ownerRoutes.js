@@ -13,9 +13,14 @@ import {
   deleteTenant,
   resetTenantAdminPassword,
   getActivityLogs,
+  deleteActivityLogsByDate,
 } from '../controllers/ownerController.js';
+import { ownerLogin } from '../controllers/authController.js';
 
 const router = express.Router();
+
+// Public Platform Owner Login endpoint (unauthenticated)
+router.post('/login', ownerLogin);
 
 // Enforce authentication and platform owner authorization on all owner endpoints
 router.use(requireAuth);
@@ -33,5 +38,7 @@ router.delete('/tenants/:id', deleteTenant);
 router.post('/tenants/:id/restore', restoreTenant);
 router.post('/tenants/:id/reset-password', resetTenantAdminPassword);
 router.get('/activity-logs', getActivityLogs);
+router.delete('/activity-logs', deleteActivityLogsByDate);
+router.post('/activity-logs/delete-by-date', deleteActivityLogsByDate);
 
 export default router;

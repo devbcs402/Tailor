@@ -55,6 +55,18 @@ export const AuthProvider = ({ children }) => {
     throw new Error(res.message || 'Login failed');
   };
 
+  const ownerLogin = async (email, password) => {
+    const res = await authApi.ownerLogin({ email, password });
+    if (res.success && res.token) {
+      localStorage.setItem('tailor_token', res.token);
+      localStorage.setItem('tailor_user', JSON.stringify(res.user));
+      setToken(res.token);
+      setUser(res.user);
+      return res;
+    }
+    throw new Error(res.message || 'Owner login failed');
+  };
+
   const changePassword = async (data) => {
     const res = await authApi.changePassword(data);
     if (res.success) {
@@ -92,6 +104,7 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated: !!token,
         loading,
         login,
+        ownerLogin,
         logout,
         changePassword,
       }}

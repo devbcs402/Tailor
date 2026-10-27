@@ -1,17 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { measurementDefinitionsApi } from '../api/measurementDefinitionsApi';
-import { SHIRT_FIELDS, PANT_FIELDS } from '../utils/measurementLabels';
 
 // In-memory cache per tenant session to avoid excessive HTTP roundtrips
 let cachedShirtDefs = null;
 let cachedPantDefs = null;
 let lastFetchTime = 0;
+let inFlightDefinitionsPromise = null;
 const CACHE_TTL_MS = 60000; // 1 minute
 
 export const clearMeasurementsCache = () => {
   cachedShirtDefs = null;
   cachedPantDefs = null;
   lastFetchTime = 0;
+  inFlightDefinitionsPromise = null;
 };
 
 /**
@@ -34,91 +35,79 @@ export const notifyMeasurementsUpdated = () => {
 };
 
 /**
- * Custom hook to load tenant's active measurement definitions with fallback to standard fields
+ * Custom hook to load tenant's active measurement definitions directly from the backend
  */
-export const useTenantMeasurements = (options = { activeOnly: true }) => {
+export const useTenantMeasurements = (options = { activeOnly: true, enabled: true }) => {
+  const enabled = options?.enabled !== false;
   const [shirtDefinitions, setShirtDefinitions] = useState(cachedShirtDefs || []);
   const [pantDefinitions, setPantDefinitions] = useState(cachedPantDefs || []);
-  const [loading, setLoading] = useState(!cachedShirtDefs || !cachedPantDefs);
+  const [loading, setLoading] = useState(enabled && (cachedShirtDefs === null || cachedPantDefs === null));
   const [error, setError] = useState(null);
 
   const fetchDefinitions = useCallback(async (force = false) => {
     const now = Date.now();
-    if (!force && cachedShirtDefs && cachedPantDefs && (now - lastFetchTime < CACHE_TTL_MS)) {
+    if (!force && cachedShirtDefs !== null && cachedPantDefs !== null && (now - lastFetchTime < CACHE_TTL_MS)) {
       setShirtDefinitions(cachedShirtDefs);
       setPantDefinitions(cachedPantDefs);
       setLoading(false);
       return;
     }
 
+    if (!force && inFlightDefinitionsPromise) {
+      try {
+        setLoading(true);
+        const sharedData = await inFlightDefinitionsPromise;
+        setShirtDefinitions(sharedData.shirt);
+        setPantDefinitions(sharedData.pant);
+        setLoading(false);
+        return;
+      } catch (err) {
+        // Fall through to direct fetch on error
+      }
+    }
+
     try {
       setLoading(true);
       setError(null);
-      const [shirtRes, pantRes] = await Promise.all([
-        measurementDefinitionsApi.getDefinitions({ category: 'shirt_measurement', active: 'true' }),
-        measurementDefinitionsApi.getDefinitions({ category: 'pant_measurement', active: 'true' }),
-      ]);
 
-      const sData = (shirtRes.data && shirtRes.data.length > 0)
-        ? shirtRes.data
-        : SHIRT_FIELDS.map((f, i) => ({
-            fieldKey: f.key,
-            displayName: f.label,
-            gujaratiName: f.gujaratiLabel,
-            fieldType: 'number',
-            isRequired: Boolean(f.required),
-            isActive: true,
-            displayOrder: i + 1,
-          }));
+      inFlightDefinitionsPromise = (async () => {
+        const [shirtRes, pantRes] = await Promise.all([
+          measurementDefinitionsApi.getDefinitions({ category: 'shirt_measurement', active: 'true' }),
+          measurementDefinitionsApi.getDefinitions({ category: 'pant_measurement', active: 'true' }),
+        ]);
 
-      const pData = (pantRes.data && pantRes.data.length > 0)
-        ? pantRes.data
-        : PANT_FIELDS.map((f, i) => ({
-            fieldKey: f.key,
-            displayName: f.label,
-            gujaratiName: f.gujaratiLabel,
-            fieldType: 'number',
-            isRequired: Boolean(f.required),
-            isActive: true,
-            displayOrder: i + 1,
-          }));
+        const sData = Array.isArray(shirtRes?.data) ? shirtRes.data : [];
+        const pData = Array.isArray(pantRes?.data) ? pantRes.data : [];
 
-      cachedShirtDefs = sData;
-      cachedPantDefs = pData;
-      lastFetchTime = now;
+        cachedShirtDefs = sData;
+        cachedPantDefs = pData;
+        lastFetchTime = Date.now();
 
-      setShirtDefinitions(sData);
-      setPantDefinitions(pData);
+        return { shirt: sData, pant: pData };
+      })();
+
+      const result = await inFlightDefinitionsPromise;
+      setShirtDefinitions(result.shirt);
+      setPantDefinitions(result.pant);
     } catch (err) {
-      console.warn('[useTenantMeasurements] Failed to load definitions from API, using defaults:', err.message);
+      console.error('[useTenantMeasurements] Failed to load definitions from API:', err);
       setError(err);
-      // Fallback to static standard fields
-      setShirtDefinitions(SHIRT_FIELDS.map((f, i) => ({
-        fieldKey: f.key,
-        displayName: f.label,
-        gujaratiName: f.gujaratiLabel,
-        fieldType: 'number',
-        isRequired: Boolean(f.required),
-        isActive: true,
-        displayOrder: i + 1,
-      })));
-      setPantDefinitions(PANT_FIELDS.map((f, i) => ({
-        fieldKey: f.key,
-        displayName: f.label,
-        gujaratiName: f.gujaratiLabel,
-        fieldType: 'number',
-        isRequired: Boolean(f.required),
-        isActive: true,
-        displayOrder: i + 1,
-      })));
+      cachedShirtDefs = null;
+      cachedPantDefs = null;
+      // Never treat a failed API request as permission to display static fallback fields.
+      setShirtDefinitions([]);
+      setPantDefinitions([]);
     } finally {
+      inFlightDefinitionsPromise = null;
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchDefinitions();
-  }, [fetchDefinitions]);
+    if (enabled) {
+      fetchDefinitions();
+    }
+  }, [fetchDefinitions, enabled]);
 
   // Listen for real-time measurement updates from settings (same tab or cross-tab)
   useEffect(() => {

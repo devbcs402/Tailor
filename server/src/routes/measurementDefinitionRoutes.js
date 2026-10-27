@@ -7,12 +7,13 @@ import {
   reorderMeasurementDefinitions,
   deleteMeasurementDefinition,
 } from '../controllers/measurementDefinitionController.js';
-import { requireAuth } from '../middleware/authMiddleware.js';
+import { requireAuth, requireTenant } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 // Strict tenant authentication required for all measurement definitions
 router.use(requireAuth);
+router.use(requireTenant);
 
 router.get('/', getMeasurementDefinitions);
 router.post('/', createMeasurementDefinition);

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Download, FileText, ExternalLink, X, Printer } from 'lucide-react';
 import { formatDate } from '../../utils/dateUtils';
-import { SHIRT_FIELDS, PANT_FIELDS, getFieldValue } from '../../utils/measurementLabels';
+import { getFieldValue } from '../../utils/measurementLabels';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useTenantMeasurements } from '../../hooks/useTenantMeasurements';
@@ -58,9 +58,7 @@ export const OrderPrintSlip = ({ order, onClose }) => {
       }));
     }
 
-    const baseDefs = Array.isArray(tenantDefs) && tenantDefs.length > 0
-      ? tenantDefs
-      : (category === 'shirt' ? SHIRT_FIELDS : PANT_FIELDS);
+    const baseDefs = Array.isArray(tenantDefs) ? tenantDefs : [];
 
     const fields = baseDefs.map(d => ({
       key: d.fieldKey || d.key,
@@ -249,16 +247,20 @@ export const OrderPrintSlip = ({ order, onClose }) => {
                   Pattern: {shirtPatternDisplay}
                 </span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
-                {shirtFieldsToDisplay.map((f) => (
-                  <div key={f.key} style={{ border: '1px solid #e2e8f0', padding: '6px 8px', borderRadius: '6px', fontSize: '0.85rem' }}>
-                    <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{f.label}</div>
-                    <div style={{ fontWeight: 700 }}>
-                      {f.value !== undefined && f.value !== '' ? f.value : '-'}
+              {shirtFieldsToDisplay.length === 0 ? (
+                <div style={{ color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic', padding: '6px' }}>No shirt measurements recorded</div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
+                  {shirtFieldsToDisplay.map((f) => (
+                    <div key={f.key} style={{ border: '1px solid #e2e8f0', padding: '6px 8px', borderRadius: '6px', fontSize: '0.85rem' }}>
+                      <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{f.label}</div>
+                      <div style={{ fontWeight: 700 }}>
+                        {f.value !== undefined && f.value !== '' ? f.value : '-'}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
               {order.shirt?.measurements?.notes && (
                 <div style={{ fontSize: '0.82rem', marginTop: '6px', color: '#475569' }}>
                   <strong>Notes:</strong> {order.shirt.measurements.notes}
@@ -276,16 +278,20 @@ export const OrderPrintSlip = ({ order, onClose }) => {
                   Pattern: {pantPatternDisplay}
                 </span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
-                {pantFieldsToDisplay.map((f) => (
-                  <div key={f.key} style={{ border: '1px solid #e2e8f0', padding: '6px 8px', borderRadius: '6px', fontSize: '0.85rem' }}>
-                    <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{f.label}</div>
-                    <div style={{ fontWeight: 700 }}>
-                      {f.value !== undefined && f.value !== '' ? f.value : '-'}
+              {pantFieldsToDisplay.length === 0 ? (
+                <div style={{ color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic', padding: '6px' }}>No pant measurements recorded</div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
+                  {pantFieldsToDisplay.map((f) => (
+                    <div key={f.key} style={{ border: '1px solid #e2e8f0', padding: '6px 8px', borderRadius: '6px', fontSize: '0.85rem' }}>
+                      <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{f.label}</div>
+                      <div style={{ fontWeight: 700 }}>
+                        {f.value !== undefined && f.value !== '' ? f.value : '-'}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
               {order.pant?.measurements?.notes && (
                 <div style={{ fontSize: '0.82rem', marginTop: '6px', color: '#475569' }}>
                   <strong>Notes:</strong> {order.pant.measurements.notes}

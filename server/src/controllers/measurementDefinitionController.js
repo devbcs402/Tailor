@@ -1,6 +1,5 @@
 import {
   MeasurementDefinition,
-  seedTenantDefaultMeasurements,
 } from '../models/MeasurementDefinition.js';
 
 /**
@@ -26,12 +25,6 @@ export const getMeasurementDefinitions = async (req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { category, active, activeOnly, all } = req.query;
-
-    // Automatically seed standard default definitions if tenant has none
-    const existingCount = await MeasurementDefinition.countDocuments({ tenantId });
-    if (existingCount === 0) {
-      await seedTenantDefaultMeasurements(tenantId);
-    }
 
     const query = { tenantId, isDeleted: { $ne: true } };
 
