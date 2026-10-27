@@ -55,11 +55,12 @@ export const login = async (req, res, next) => {
         });
       }
 
-      if (tenant.status === 'inactive') {
+      if (tenant.status === 'inactive' || tenant.status === 'archived') {
+        const isArchived = tenant.status === 'archived';
         return res.status(403).json({
           success: false,
-          code: 'TENANT_INACTIVE',
-          message: 'Your business account has been deactivated. Please contact platform support.',
+          code: isArchived ? 'TENANT_ARCHIVED' : 'TENANT_INACTIVE',
+          message: `Your business account has been ${isArchived ? 'archived' : 'deactivated'}. Please contact platform support.`,
         });
       }
 

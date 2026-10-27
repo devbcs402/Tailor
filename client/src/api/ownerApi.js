@@ -11,6 +11,9 @@ export const ownerApi = {
   updateTenant: (id, data) => api.patch(`/owner/tenants/${id}`, data),
   activateTenant: (id) => api.post(`/owner/tenants/${id}/activate`, {}),
   deactivateTenant: (id, reason = '') => api.post(`/owner/tenants/${id}/deactivate`, { reason }),
+  archiveTenant: (id, reason = '') => api.post(`/owner/tenants/${id}/archive`, { reason }),
+  deleteTenant: (id, reason = '') => api.delete(`/owner/tenants/${id}`),
+  restoreTenant: (id) => api.post(`/owner/tenants/${id}/restore`, {}),
   getActivityLogs: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     return api.get(`/owner/activity-logs?${query}`);

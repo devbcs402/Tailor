@@ -15,6 +15,17 @@ import { CustomerDetailsPage } from './pages/CustomerDetailsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { PatternSettingsPage } from './pages/PatternSettingsPage';
 
+// Owner Portal Imports
+import { OwnerProtectedRoute } from './routes/OwnerProtectedRoute';
+import { OwnerLayout } from './components/owner/OwnerLayout';
+import { OwnerLoginPage } from './pages/owner/OwnerLoginPage';
+import { OwnerDashboardPage } from './pages/owner/OwnerDashboardPage';
+import { OwnerTenantsPage } from './pages/owner/OwnerTenantsPage';
+import { OwnerTenantDetailsPage } from './pages/owner/OwnerTenantDetailsPage';
+import { OwnerCreateTenantPage } from './pages/owner/OwnerCreateTenantPage';
+import { OwnerEditTenantPage } from './pages/owner/OwnerEditTenantPage';
+import { OwnerActivityLogsPage } from './pages/owner/OwnerActivityLogsPage';
+
 export function App() {
   return (
     <BrowserRouter>
@@ -24,7 +35,23 @@ export function App() {
             {/* Public Login Route */}
             <Route path="/login" element={<LoginPage />} />
 
-            {/* Protected Routes */}
+            {/* Platform Owner Login Route */}
+            <Route path="/owner/login" element={<OwnerLoginPage />} />
+            <Route path="/owner" element={<Navigate to="/owner/dashboard" replace />} />
+
+            {/* Platform Owner Protected Portal */}
+            <Route element={<OwnerProtectedRoute />}>
+              <Route element={<OwnerLayout />}>
+                <Route path="/owner/dashboard" element={<OwnerDashboardPage />} />
+                <Route path="/owner/tenants" element={<OwnerTenantsPage />} />
+                <Route path="/owner/tenants/create" element={<OwnerCreateTenantPage />} />
+                <Route path="/owner/tenants/:id" element={<OwnerTenantDetailsPage />} />
+                <Route path="/owner/tenants/:id/edit" element={<OwnerEditTenantPage />} />
+                <Route path="/owner/activity-logs" element={<OwnerActivityLogsPage />} />
+              </Route>
+            </Route>
+
+            {/* Tenant Protected Routes */}
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
                 <Route path="/" element={<DashboardPage />} />

@@ -8,6 +8,8 @@ import {
   updateTenant,
   activateTenant,
   deactivateTenant,
+  archiveTenant,
+  restoreTenant,
   getActivityLogs,
 } from '../controllers/ownerController.js';
 
@@ -24,6 +26,9 @@ router.get('/tenants/:id', getTenantById);
 router.patch('/tenants/:id', updateTenant);
 router.post('/tenants/:id/activate', activateTenant);
 router.post('/tenants/:id/deactivate', deactivateTenant);
+router.post('/tenants/:id/archive', archiveTenant);
+router.delete('/tenants/:id', archiveTenant);
+router.post('/tenants/:id/restore', restoreTenant);
 router.get('/activity-logs', getActivityLogs);
 
 export default router;

@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Clock,
   ExternalLink,
+  Archive,
 } from 'lucide-react';
 import { ownerApi } from '../../api/ownerApi';
 import { CreateTenantModal } from '../../components/owner/CreateTenantModal';
@@ -28,14 +29,16 @@ export const OwnerDashboardPage = () => {
       setLoading(true);
       setError('');
       const response = await ownerApi.getPlatformStats();
-      if (response.data?.success) {
-        setStats(response.data.data);
+      if (response?.success && response?.data) {
+        setStats(response.data);
+      } else if (response?.data) {
+        setStats(response.data);
       } else {
-        setError(response.data?.message || 'Failed to load platform statistics');
+        setError(response?.message || 'Failed to load platform statistics');
       }
     } catch (err) {
       console.error('Error loading platform stats:', err);
-      setError(err.response?.data?.message || 'Failed to connect to platform server');
+      setError(err.message || 'Failed to connect to platform server');
     } finally {
       setLoading(false);
     }
@@ -277,6 +280,45 @@ export const OwnerDashboardPage = () => {
           </div>
           <div style={{ marginTop: '12px', fontSize: '0.8rem', color: '#64748b' }}>
             Access temporarily disabled
+          </div>
+        </div>
+
+        {/* Archived Tenants */}
+        <div
+          style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            padding: '20px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ color: '#d97706', fontSize: '0.82rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Archived Tenants
+              </div>
+              <div style={{ fontSize: '2rem', fontWeight: 800, color: '#d97706', marginTop: '6px' }}>
+                {loading ? '...' : (stats?.archivedTenants ?? 0)}
+              </div>
+            </div>
+            <div
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '10px',
+                backgroundColor: '#fef3c7',
+                color: '#d97706',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Archive size={22} />
+            </div>
+          </div>
+          <div style={{ marginTop: '12px', fontSize: '0.8rem', color: '#64748b' }}>
+            Historical records preserved
           </div>
         </div>
 

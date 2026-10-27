@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { Scissors, Eye, EyeOff, Lock, Mail, ArrowRight, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -11,11 +11,14 @@ export const LoginPage = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
   const { success } = useToast();
   const navigate = useNavigate();
 
   if (isAuthenticated) {
+    if (user?.role === 'platform_owner') {
+      return <Navigate to="/owner/dashboard" replace />;
+    }
     return <Navigate to="/" replace />;
   }
 
@@ -34,9 +37,13 @@ export const LoginPage = () => {
 
     setLoading(true);
     try {
-      await login(email, password);
+      const res = await login(email, password);
       success('Logged in successfully! Welcome.');
-      navigate('/');
+      if (res?.user?.role === 'platform_owner') {
+        navigate('/owner/dashboard');
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       setError(err.message || 'Invalid email or password');
     } finally {
@@ -224,6 +231,23 @@ export const LoginPage = () => {
           >
             <Sparkles size={14} color="var(--accent-gold)" /> admin@tailor.com / admin123
           </button>
+
+          <div style={{ marginTop: '16px' }}>
+            <Link
+              to="/owner/login"
+              style={{
+                color: '#64748b',
+                fontSize: '0.82rem',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontWeight: 500,
+              }}
+            >
+              Platform Administrator? <span style={{ color: '#0b1f3a', fontWeight: 600 }}>Owner Portal &rarr;</span>
+            </Link>
+          </div>
         </div>
       </div>
     </div>

@@ -54,7 +54,7 @@ const tenantSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'inactive'],
+      enum: ['active', 'inactive', 'archived'],
       default: 'active',
       index: true,
     },
@@ -66,6 +66,20 @@ const tenantSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       default: null,
+    },
+    archivedAt: {
+      type: Date,
+      default: null,
+    },
+    archivedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    archiveReason: {
+      type: String,
+      default: '',
+      trim: true,
     },
     notes: {
       type: String,

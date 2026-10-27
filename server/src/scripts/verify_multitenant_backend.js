@@ -226,8 +226,47 @@ async function runMultiTenantVerification() {
     }
     console.log(`✓ [Tenant Lifecycle]: Royal Tailors access fully restored with existing customer "${restoredData.data[0].name}" intact.`);
 
-    // 14. Audit Logs Verification
-    const auditRes = await fetch(`${BASE_URL}/owner/activity-logs?limit=10`, { headers: ownerHeaders });
+    // 14. Safe Controlled Tenant Archival / Deletion & Restoration Test
+    console.log('\n--- Testing Safe Controlled Archival / Deletion & Restoration ---');
+    const archiveRes = await fetch(`${BASE_URL}/owner/tenants/${newTenant._id}/archive`, {
+      method: 'POST',
+      headers: ownerHeaders,
+      body: JSON.stringify({ reason: 'Business contract ended' }),
+    });
+    const archiveData = await archiveRes.json();
+    if (!archiveData.success) {
+      throw new Error('Tenant archival failed: ' + JSON.stringify(archiveData));
+    }
+    console.log(`✓ [Tenant Archival]: Safely archived tenant "${newTenant.businessName}".`);
+
+    // 14.1 Verify archived tenant is blocked immediately
+    const blockedArchiveApiRes = await fetch(`${BASE_URL}/customers`, { headers: royalHeaders });
+    if (blockedArchiveApiRes.status !== 403) {
+      throw new Error(`Expected 403 on archived tenant API call, got: ${blockedArchiveApiRes.status}`);
+    }
+    console.log(`✓ [Tenant Archival]: Archived tenant API access immediately blocked.`);
+
+    // 14.2 Restore tenant from archive
+    const unarchiveRes = await fetch(`${BASE_URL}/owner/tenants/${newTenant._id}/restore`, {
+      method: 'POST',
+      headers: ownerHeaders,
+    });
+    const unarchiveData = await unarchiveRes.json();
+    if (!unarchiveData.success) {
+      throw new Error('Tenant restore failed: ' + JSON.stringify(unarchiveData));
+    }
+    console.log(`✓ [Tenant Restore]: Restored archived tenant "${newTenant.businessName}" to active status.`);
+
+    // 14.3 Verify data preservation after restore
+    const postRestoreRes = await fetch(`${BASE_URL}/customers`, { headers: royalHeaders });
+    const postRestoreData = await postRestoreRes.json();
+    if (!postRestoreData.data || postRestoreData.data.length !== 1) {
+      throw new Error('Historical data was compromised during archival/restoration lifecycle!');
+    }
+    console.log(`✓ [Tenant Data Preservation]: Confirmed historical customer record "${postRestoreData.data[0].name}" preserved intact.`);
+
+    // 15. Audit Logs Verification
+    const auditRes = await fetch(`${BASE_URL}/owner/activity-logs?limit=20`, { headers: ownerHeaders });
     const auditData = await auditRes.json();
     if (!auditData.success || auditData.data.length === 0) {
       throw new Error('No audit logs found!');

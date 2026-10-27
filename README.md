@@ -37,12 +37,21 @@ npm run dev      # Runs on http://localhost:5173
 
 ---
 
-## 🔑 Default Credentials (Seed Data)
+## 🔑 Default Credentials
 
+### Platform Owner (Superadministrator)
+- **Login URL:** [http://localhost:5173/owner/login](http://localhost:5173/owner/login)
+- **Email:** `owner@platform.com`
+- **Password:** `Owner@Pass2026!`
+- **Bootstrap Command:** `node server/src/scripts/bootstrap_owner.js`
+
+### Primary Tenant Admin (Silai Master Studio)
 - **Login URL:** [http://localhost:5173/login](http://localhost:5173/login)
 - **Email:** `admin@tailor.com`
 - **Password:** `admin123`
-*(A quick one-click demo credentials button is also available on the login screen for testing convenience.)*
+*(A quick one-click demo credentials button is available on the login screen for testing convenience.)*
+
+> 📖 **Comprehensive Guide:** See [MULTI_TENANT_GUIDE.md](file:///d:/YASH%20KACHA/Tai/MULTI_TENANT_GUIDE.md) for full architectural documentation, tenant isolation mechanics, data migration, and production deployment instructions.
 
 ---
 

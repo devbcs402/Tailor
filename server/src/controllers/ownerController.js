@@ -14,6 +14,7 @@ export const getPlatformStats = async (req, res, next) => {
     const totalTenants = await Tenant.countDocuments();
     const activeTenants = await Tenant.countDocuments({ status: 'active' });
     const inactiveTenants = await Tenant.countDocuments({ status: 'inactive' });
+    const archivedTenants = await Tenant.countDocuments({ status: 'archived' });
     const totalTenantUsers = await User.countDocuments({ role: { $ne: 'platform_owner' } });
     const totalCustomers = await Customer.countDocuments();
     const totalOrders = await Order.countDocuments();
@@ -36,6 +37,7 @@ export const getPlatformStats = async (req, res, next) => {
         totalTenants,
         activeTenants,
         inactiveTenants,
+        archivedTenants,
         totalTenantUsers,
         totalCustomers,
         totalOrders,
@@ -477,6 +479,105 @@ export const deactivateTenant = async (req, res, next) => {
     return res.json({
       success: true,
       message: `Tenant "${tenant.businessName}" has been deactivated. Business API access suspended.`,
+      data: tenant,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Archive Tenant (Safe controlled soft-deletion preserving historical business data)
+ */
+export const archiveTenant = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason = 'Archived by platform administrator' } = req.body;
+
+    const tenant = await Tenant.findById(id);
+    if (!tenant) {
+      return res.status(404).json({ success: false, message: 'Tenant not found' });
+    }
+
+    tenant.status = 'archived';
+    tenant.archivedAt = new Date();
+    tenant.archivedBy = req.user._id;
+    tenant.archiveReason = String(reason || '').trim();
+    await tenant.save();
+
+    // Disable tenant users so they cannot authenticate
+    await User.updateMany({ tenantId: tenant._id }, { $set: { isActive: false } });
+
+    // Record Audit Log
+    try {
+      await AuditLog.create({
+        actor: req.user._id,
+        actorEmail: req.user.email,
+        actorRole: req.user.role,
+        action: 'tenant_archived',
+        targetTenant: tenant._id,
+        targetTenantName: tenant.businessName,
+        details: { archivedAt: tenant.archivedAt, reason: tenant.archiveReason },
+        ipAddress: req.ip || '',
+        userAgent: req.headers['user-agent'] || '',
+      });
+    } catch (auditErr) {
+      console.warn('[Audit Warning] Could not record tenant_archived audit:', auditErr.message);
+    }
+
+    return res.json({
+      success: true,
+      message: `Tenant "${tenant.businessName}" has been safely archived. All customer and order records preserved.`,
+      data: tenant,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Restore an Archived Tenant
+ */
+export const restoreTenant = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const tenant = await Tenant.findById(id);
+    if (!tenant) {
+      return res.status(404).json({ success: false, message: 'Tenant not found' });
+    }
+
+    tenant.status = 'active';
+    tenant.archivedAt = null;
+    tenant.archivedBy = null;
+    tenant.archiveReason = '';
+    tenant.deactivatedAt = null;
+    tenant.deactivatedBy = null;
+    await tenant.save();
+
+    // Re-enable tenant users
+    await User.updateMany({ tenantId: tenant._id }, { $set: { isActive: true } });
+
+    // Record Audit Log
+    try {
+      await AuditLog.create({
+        actor: req.user._id,
+        actorEmail: req.user.email,
+        actorRole: req.user.role,
+        action: 'tenant_restored',
+        targetTenant: tenant._id,
+        targetTenantName: tenant.businessName,
+        details: { restoredAt: new Date() },
+        ipAddress: req.ip || '',
+        userAgent: req.headers['user-agent'] || '',
+      });
+    } catch (auditErr) {
+      console.warn('[Audit Warning] Could not record tenant_restored audit:', auditErr.message);
+    }
+
+    return res.json({
+      success: true,
+      message: `Tenant "${tenant.businessName}" has been restored to active status.`,
       data: tenant,
     });
   } catch (error) {
