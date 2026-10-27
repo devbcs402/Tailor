@@ -18,7 +18,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const businessName = user?.tenant?.businessName || user?.shopName || 'Silai Master';
+  const businessName = user?.tenant?.businessName || user?.shopName || 'Tailor Studio';
 
   // Prevent background content from scrolling when mobile drawer is open
   React.useEffect(() => {

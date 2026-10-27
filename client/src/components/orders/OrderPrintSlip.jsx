@@ -59,19 +59,31 @@ export const OrderPrintSlip = ({ order, onClose }) => {
     }
 
     const baseDefs = Array.isArray(tenantDefs) ? tenantDefs : [];
+    const defsMap = new Map();
+    baseDefs.forEach((d) => {
+      if (d && (d.fieldKey || d.key)) {
+        defsMap.set(d.fieldKey || d.key, d);
+      }
+    });
 
-    const fields = baseDefs.map(d => ({
-      key: d.fieldKey || d.key,
-      label: d.gujaratiName ? `${d.displayName || d.label} (${d.gujaratiName})` : (d.displayName || d.label),
-      value: getFieldValue(measurements, d.fieldKey || d.key),
-    }));
-
-    const existingKeys = new Set(fields.map(f => f.key));
-    Object.keys(measurements).forEach(k => {
-      if (k !== 'notes' && !existingKeys.has(k) && measurements[k] !== undefined && measurements[k] !== '') {
+    // For legacy orders without a snapshot, render ONLY measurements that actually have saved values
+    const fields = [];
+    Object.keys(measurements).forEach((k) => {
+      if (
+        k !== 'notes' &&
+        k !== '_id' &&
+        !k.startsWith('$') &&
+        !k.startsWith('_') &&
+        measurements[k] !== undefined &&
+        measurements[k] !== null &&
+        String(measurements[k]).trim().length > 0
+      ) {
+        const def = defsMap.get(k);
+        const displayName = def?.displayName || def?.label || k.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+        const gujaratiName = def?.gujaratiName || '';
         fields.push({
           key: k,
-          label: k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          label: gujaratiName ? `${displayName} (${gujaratiName})` : displayName,
           value: measurements[k],
         });
       }

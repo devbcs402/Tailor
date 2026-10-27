@@ -288,7 +288,7 @@ export const SettingsPage = () => {
                 Operator Email
               </div>
               <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-main)', marginTop: '2px' }}>
-                {user?.email || 'admin@tailor.com'}
+                {user?.email || '—'}
               </div>
             </div>
 

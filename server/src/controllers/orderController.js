@@ -4,28 +4,6 @@ import { Customer } from '../models/Customer.js';
 import { MeasurementDefinition } from '../models/MeasurementDefinition.js';
 import { generateNextOrderNumber } from '../models/OrderCounter.js';
 
-export const REQUIRED_SHIRT_FIELDS = ['length', 'chest', 'waist', 'shoulder', 'sleeveLength'];
-export const REQUIRED_PANT_FIELDS = ['length', 'waist', 'hip', 'bottomOpening'];
-
-export const validateGarmentMeasurements = (measurements = {}, requiredFields, garmentName) => {
-  for (const field of requiredFields) {
-    const val = measurements[field];
-    if (val === undefined || val === null || String(val).trim() === '') {
-      return `Required ${garmentName} measurement "${field}" is missing.`;
-    }
-  }
-
-  for (const [key, val] of Object.entries(measurements)) {
-    if (key !== 'notes' && key !== '_id' && val !== undefined && val !== null && String(val).trim() !== '') {
-      const num = parseFloat(val);
-      if (isNaN(num) || num <= 0) {
-        return `${garmentName.charAt(0).toUpperCase() + garmentName.slice(1)} measurement "${key}" must be a valid positive number.`;
-      }
-    }
-  }
-
-  return null;
-};
 
 const normalizeKey = (k) => String(k || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 

@@ -2,7 +2,7 @@
  * API Client for making authenticated requests to Express backend
  */
 
-const BASE_URL = '/api';
+const BASE_URL = import.meta.env?.VITE_API_URL || '/api';
 
 // In-flight GET request deduplication cache
 const inFlightGetRequests = new Map();

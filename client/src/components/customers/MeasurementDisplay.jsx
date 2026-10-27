@@ -6,10 +6,10 @@ import { getFieldValue, normalizeKey, TAILOR_ALIASES } from '../../utils/measure
 
 export const MeasurementDisplay = ({
   measurements,
-  shirtPattern = 'plain',
+  shirtPattern = '',
   shirtCustomPattern = '',
   shirtPatterns = [],
-  pantPattern = 'plain_pant',
+  pantPattern = '',
   pantCustomPattern = '',
   pantPatterns = [],
   updatedAt,

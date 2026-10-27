@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { SHIRT_FIELDS, PANT_FIELDS, getFieldValue, normalizeKey } from '../utils/measurementLabels.js';
+import { getFieldValue, normalizeKey } from '../utils/measurementLabels.js';
 import { getShirtPatternLabel, getPantPatternLabel } from '../utils/patternOptions.js';
 import { formatDate } from '../utils/dateUtils.js';
 
@@ -380,7 +380,7 @@ export const generateOrderSlipPdf = (order, user = null, options = {}) => {
   doc.setTextColor(...COLORS.white);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  const shopName = (user?.tenant?.businessName || user?.shopName || 'SILAI MASTER').toUpperCase();
+  const shopName = (user?.tenant?.businessName || user?.shopName || 'TAILOR STUDIO').toUpperCase();
   doc.text(shopName, margin + 8, y + 10);
 
   // Subtitle

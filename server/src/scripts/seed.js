@@ -10,6 +10,11 @@ dotenv.config();
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/tailor_management';
 
 async function seedDatabase() {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('[Seed Error] Automatic or manual database seeding is prohibited in production to protect customer, order, and tenant data integrity.');
+    process.exit(1);
+  }
+
   try {
     console.log('[Seed] Connecting to MongoDB...');
     await mongoose.connect(MONGODB_URI);
