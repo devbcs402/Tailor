@@ -1,0 +1,20 @@
+{
+  "_id": {
+    "$oid": "6adf52b3faad847e672e4d3d"
+  },
+  "name": "Central Platform Owner",
+  "email": "owner@platform.com",
+  "passwordHash": "$2a$10$twZ4Fc6yPt39blyX7pMKouikF4UU1G4UFmnFMg64TX8.EX7Zk2mYC",
+  "role": "platform_owner",
+  "tenantId": null,
+  "shopName": "Central Platform Administration",
+  "isActive": true,
+  "mustChangePassword": false,
+  "createdAt": {
+    "$date": "2026-10-26T13:16:35.059Z"
+  },
+  "updatedAt": {
+    "$date": "2026-10-26T13:16:35.059Z"
+  },
+  "__v": 0
+}
