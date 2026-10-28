@@ -897,11 +897,13 @@ export const OwnerTenantsPage = () => {
           totalPages={totalPages}
           totalRecords={totalRecords}
           pageSize={pageSize}
-          pageSizeOptions={[10, 20, 50]}
+          pageSizeOptions={[5, 10, 25, 50]}
           onPageChange={(newPage) => setPage(newPage)}
           onPageSizeChange={(newSize) => {
+            const newTotalPages = Math.ceil(totalRecords / newSize) || 1;
+            const targetPage = page > newTotalPages ? 1 : page;
             setPageSize(newSize);
-            setPage(1);
+            setPage(targetPage);
           }}
         />
       </div>

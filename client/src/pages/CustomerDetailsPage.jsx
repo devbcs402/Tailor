@@ -24,6 +24,7 @@ import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { ShirtMeasurements } from '../components/orders/ShirtMeasurements';
 import { PantMeasurements } from '../components/orders/PantMeasurements';
+import { DataTablePagination } from '../components/common/DataTablePagination';
 
 export const CustomerDetailsPage = () => {
   const { id } = useParams();
@@ -35,6 +36,17 @@ export const CustomerDetailsPage = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Orders pagination
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [ordersPageSize, setOrdersPageSize] = useState(10);
+
+  const ordersTotalRecords = orders.length;
+  const ordersTotalPages = Math.ceil(ordersTotalRecords / ordersPageSize) || 1;
+  const ordersCurrentPage = Math.min(Math.max(1, ordersPage), ordersTotalPages);
+  const ordersStartIndex = (ordersCurrentPage - 1) * ordersPageSize;
+  const ordersEndIndex = ordersStartIndex + ordersPageSize;
+  const displayedOrders = orders.slice(ordersStartIndex, ordersEndIndex);
 
   // Modals
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -393,56 +405,74 @@ export const CustomerDetailsPage = () => {
             </button>
           </div>
         ) : (
-          <div className="table-responsive">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Order #</th>
-                  <th>Order Date</th>
-                  <th>Deadline</th>
-                  <th>Garments</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((o) => (
-                  <tr key={o._id}>
-                    <td style={{ fontWeight: 700, color: 'var(--primary)' }}>
-                      {o.orderNumber}
-                    </td>
-                    <td>{formatDate(o.orderDate)}</td>
-                    <td>{formatDate(o.deadline)}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        {o.shirt?.quantity > 0 && (
-                          <span style={{ fontSize: '0.8rem', padding: '2px 6px', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '4px' }}>
-                            Shirt: {o.shirt.quantity}
-                          </span>
-                        )}
-                        {o.pant?.quantity > 0 && (
-                          <span style={{ fontSize: '0.8rem', padding: '2px 6px', background: 'var(--accent-gold-light)', color: 'var(--secondary)', borderRadius: '4px' }}>
-                            Pant: {o.pant.quantity}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <StatusBadge status={o.status} />
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <button
-                        onClick={() => navigate(`/orders/${o._id}`)}
-                        className="btn btn-outline btn-sm"
-                      >
-                        <Eye size={14} /> Details
-                      </button>
-                    </td>
+          <>
+            <div className="table-responsive">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Order #</th>
+                    <th>Order Date</th>
+                    <th>Deadline</th>
+                    <th>Garments</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {displayedOrders.map((o) => (
+                    <tr key={o._id}>
+                      <td style={{ fontWeight: 700, color: 'var(--primary)' }}>
+                        {o.orderNumber}
+                      </td>
+                      <td>{formatDate(o.orderDate)}</td>
+                      <td>{formatDate(o.deadline)}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          {o.shirt?.quantity > 0 && (
+                            <span style={{ fontSize: '0.8rem', padding: '2px 6px', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '4px' }}>
+                              Shirt: {o.shirt.quantity}
+                            </span>
+                          )}
+                          {o.pant?.quantity > 0 && (
+                            <span style={{ fontSize: '0.8rem', padding: '2px 6px', background: 'var(--accent-gold-light)', color: 'var(--secondary)', borderRadius: '4px' }}>
+                              Pant: {o.pant.quantity}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <StatusBadge status={o.status} />
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button
+                          onClick={() => navigate(`/orders/${o._id}`)}
+                          className="btn btn-outline btn-sm"
+                        >
+                          <Eye size={14} /> Details
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <DataTablePagination
+              currentPage={ordersCurrentPage}
+              totalPages={ordersTotalPages}
+              totalRecords={ordersTotalRecords}
+              pageSize={ordersPageSize}
+              pageSizeOptions={[5, 10, 25, 50]}
+              onPageChange={(newPage) => setOrdersPage(newPage)}
+              onPageSizeChange={(newSize) => {
+                const newTotalPages = Math.ceil(ordersTotalRecords / newSize) || 1;
+                if (ordersCurrentPage > newTotalPages) {
+                  setOrdersPage(1);
+                }
+                setOrdersPageSize(newSize);
+              }}
+            />
+          </>
         )}
       </div>
 

@@ -26,8 +26,8 @@ import { useToast } from '../context/ToastContext';
 
 export const OrdersPage = () => {
   const [orders, setOrders] = useState([]);
-  const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0, totalRecords: 0, totalPages: 1 });
-  const [pageSize, setPageSize] = useState(15);
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalRecords: 0, totalPages: 1 });
+  const [pageSize, setPageSize] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -69,7 +69,7 @@ export const OrdersPage = () => {
 
       setOrders(res.data || []);
       const p = res.pagination || {};
-      const totalCount = p.total !== undefined ? p.total : (p.totalRecords || 0);
+      const totalCount = p.total !== undefined ? p.total : (p.totalRecords !== undefined ? p.totalRecords : (res.total || 0));
       const totalPages = p.totalPages !== undefined ? p.totalPages : (Math.ceil(totalCount / currentSize) || 0);
       setPagination({
         page: p.page || page,
@@ -94,10 +94,10 @@ export const OrdersPage = () => {
     }
   };
 
-  // Re-fetch on filter or sort or search or pageSize change (reset to page 1)
+  // Re-fetch on filter or sort or search change (reset to page 1)
   useEffect(() => {
     fetchOrders(1, pageSize);
-  }, [search, statusFilter, sortBy, pageSize]);
+  }, [search, statusFilter, sortBy]);
 
   const handleResetFilters = () => {
     setSearch('');
@@ -112,10 +112,14 @@ export const OrdersPage = () => {
     fetchOrders(newPage, pageSize);
   };
 
-  // Only update pageSize state; the useEffect on pageSize will trigger the single necessary request
+  // When changing rows per page, reset to page 1 if the current page becomes invalid
   const handlePageSizeChange = (newSize) => {
     if (newSize === pageSize) return;
+    const totalCount = pagination.total || 0;
+    const newTotalPages = Math.ceil(totalCount / newSize) || 1;
+    const targetPage = pagination.page > newTotalPages ? 1 : pagination.page;
     setPageSize(newSize);
+    fetchOrders(targetPage, newSize);
   };
 
   const handleDeleteOrder = async () => {
@@ -284,30 +288,41 @@ export const OrdersPage = () => {
             <ErrorMessage message={error} onRetry={() => fetchOrders(pagination.page)} />
           </div>
         ) : orders.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
-            <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>No orders found</div>
-            <p style={{ fontSize: '0.88rem', marginTop: '6px' }}>
-              {search || statusFilter !== 'all'
-                ? 'Try adjusting your search or filters.'
-                : 'Get started by creating your first tailoring order.'}
-            </p>
-            {hasActiveFilters ? (
-              <button
-                onClick={handleResetFilters}
-                className="btn btn-outline btn-sm"
-                style={{ marginTop: '16px' }}
-              >
-                Clear Filters
-              </button>
-            ) : (
-              <button
-                onClick={() => navigate('/orders/create')}
-                className="btn btn-primary"
-                style={{ marginTop: '16px' }}
-              >
-                <Plus size={16} /> Create New Order
-              </button>
-            )}
+          <div>
+            <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>No orders found</div>
+              <p style={{ fontSize: '0.88rem', marginTop: '6px' }}>
+                {search || statusFilter !== 'all'
+                  ? 'Try adjusting your search or filters.'
+                  : 'Get started by creating your first tailoring order.'}
+              </p>
+              {hasActiveFilters ? (
+                <button
+                  onClick={handleResetFilters}
+                  className="btn btn-outline btn-sm"
+                  style={{ marginTop: '16px' }}
+                >
+                  Clear Filters
+                </button>
+              ) : (
+                <button
+                  onClick={() => navigate('/orders/create')}
+                  className="btn btn-primary"
+                  style={{ marginTop: '16px' }}
+                >
+                  <Plus size={16} /> Create New Order
+                </button>
+              )}
+            </div>
+            <DataTablePagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              totalRecords={pagination.total}
+              pageSize={pageSize}
+              pageSizeOptions={[5, 10, 25, 50]}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
           </div>
         ) : (
           <div>
@@ -494,7 +509,7 @@ export const OrdersPage = () => {
               totalPages={pagination.totalPages}
               totalRecords={pagination.total}
               pageSize={pageSize}
-              pageSizeOptions={[10, 25, 50]}
+              pageSizeOptions={[5, 10, 25, 50]}
               onPageChange={handlePageChange}
               onPageSizeChange={handlePageSizeChange}
             />

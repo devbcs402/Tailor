@@ -66,8 +66,8 @@ export const getTenants = async (req, res, next) => {
       limit = 10,
     } = req.query;
 
-    const pageNum = Math.max(1, parseInt(page, 10));
-    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10)));
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
     const skip = (pageNum - 1) * limitNum;
 
     const query = {};
@@ -887,9 +887,9 @@ export const resetTenantAdminPassword = async (req, res, next) => {
  */
 export const getActivityLogs = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, action = '' } = req.query;
-    const pageNum = Math.max(1, parseInt(page, 10));
-    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10)));
+    const { page = 1, limit = 10, action = '' } = req.query;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
     const skip = (pageNum - 1) * limitNum;
 
     const query = {};

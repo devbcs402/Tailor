@@ -16,6 +16,7 @@ import { useToast } from '../context/ToastContext';
 import { SearchInput } from '../components/common/SearchInput';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { Loading } from '../components/common/Loading';
+import { DataTablePagination } from '../components/common/DataTablePagination';
 import { notifyPatternsUpdated } from '../hooks/useTenantPatterns';
 
 export const PatternSettingsPage = () => {
@@ -205,6 +206,36 @@ export const PatternSettingsPage = () => {
     p.name.toLowerCase().includes(pantSearch.trim().toLowerCase())
   );
 
+  // Client-side pagination for shirt patterns
+  const [shirtPage, setShirtPage] = useState(1);
+  const [shirtPageSize, setShirtPageSize] = useState(10);
+
+  useEffect(() => {
+    setShirtPage(1);
+  }, [shirtSearch]);
+
+  const shirtTotalRecords = filteredShirtPatterns.length;
+  const shirtTotalPages = Math.ceil(shirtTotalRecords / shirtPageSize) || 1;
+  const shirtCurrentPage = Math.min(Math.max(1, shirtPage), shirtTotalPages);
+  const shirtStartIndex = (shirtCurrentPage - 1) * shirtPageSize;
+  const shirtEndIndex = shirtStartIndex + shirtPageSize;
+  const displayedShirtPatterns = filteredShirtPatterns.slice(shirtStartIndex, shirtEndIndex);
+
+  // Client-side pagination for pant patterns
+  const [pantPage, setPantPage] = useState(1);
+  const [pantPageSize, setPantPageSize] = useState(10);
+
+  useEffect(() => {
+    setPantPage(1);
+  }, [pantSearch]);
+
+  const pantTotalRecords = filteredPantPatterns.length;
+  const pantTotalPages = Math.ceil(pantTotalRecords / pantPageSize) || 1;
+  const pantCurrentPage = Math.min(Math.max(1, pantPage), pantTotalPages);
+  const pantStartIndex = (pantCurrentPage - 1) * pantPageSize;
+  const pantEndIndex = pantStartIndex + pantPageSize;
+  const displayedPantPatterns = filteredPantPatterns.slice(pantStartIndex, pantEndIndex);
+
   return (
     <div style={{ maxWidth: '1180px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Top Action Bar with Back to Settings */}
@@ -347,7 +378,7 @@ export const PatternSettingsPage = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredShirtPatterns.map((pat) => (
+                    displayedShirtPatterns.map((pat) => (
                       <tr key={pat._id}>
                         <td>
                           {editingId === pat._id ? (
@@ -407,6 +438,22 @@ export const PatternSettingsPage = () => {
                 </tbody>
               </table>
             </div>
+
+            <DataTablePagination
+              currentPage={shirtCurrentPage}
+              totalPages={shirtTotalPages}
+              totalRecords={shirtTotalRecords}
+              pageSize={shirtPageSize}
+              pageSizeOptions={[5, 10, 25, 50]}
+              onPageChange={(newPage) => setShirtPage(newPage)}
+              onPageSizeChange={(newSize) => {
+                const newTotalPages = Math.ceil(shirtTotalRecords / newSize) || 1;
+                if (shirtCurrentPage > newTotalPages) {
+                  setShirtPage(1);
+                }
+                setShirtPageSize(newSize);
+              }}
+            />
           </div>
 
           {/* Section 2: Pant Patterns */}
@@ -472,7 +519,7 @@ export const PatternSettingsPage = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredPantPatterns.map((pat) => (
+                    displayedPantPatterns.map((pat) => (
                       <tr key={pat._id}>
                         <td>
                           {editingId === pat._id ? (
@@ -532,6 +579,22 @@ export const PatternSettingsPage = () => {
                 </tbody>
               </table>
             </div>
+
+            <DataTablePagination
+              currentPage={pantCurrentPage}
+              totalPages={pantTotalPages}
+              totalRecords={pantTotalRecords}
+              pageSize={pantPageSize}
+              pageSizeOptions={[5, 10, 25, 50]}
+              onPageChange={(newPage) => setPantPage(newPage)}
+              onPageSizeChange={(newSize) => {
+                const newTotalPages = Math.ceil(pantTotalRecords / newSize) || 1;
+                if (pantCurrentPage > newTotalPages) {
+                  setPantPage(1);
+                }
+                setPantPageSize(newSize);
+              }}
+            />
           </div>
         </div>
       )}

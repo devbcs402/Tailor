@@ -3,35 +3,51 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export const DataTablePagination = ({
   currentPage = 1,
+  page,
   totalPages = 1,
   totalRecords = 0,
-  pageSize = 15,
-  pageSizeOptions = [10, 25, 50],
+  pageSize = 10,
+  pageSizeOptions = [5, 10, 25, 50],
   onPageChange,
   onPageSizeChange,
 }) => {
-  if (totalRecords === 0 && totalPages <= 1) {
-    return null;
-  }
+  const activePage = page !== undefined ? page : (currentPage || 1);
+  const safeTotalPages = totalPages !== undefined ? totalPages : (Math.ceil(totalRecords / pageSize) || 0);
 
-  const startRecord = totalRecords === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const endRecord = Math.min(currentPage * pageSize, totalRecords);
+  const startRecord = totalRecords === 0 ? 0 : (activePage - 1) * pageSize + 1;
+  const endRecord = totalRecords === 0 ? 0 : Math.min(activePage * pageSize, totalRecords);
+  const displayStart = Math.min(startRecord, endRecord);
 
-  // Generate page numbers with ellipsis for cleaner mobile display
+  const options = pageSizeOptions.includes(pageSize)
+    ? pageSizeOptions
+    : [...pageSizeOptions, pageSize].sort((a, b) => a - b);
+
+  // Generate page numbers with ellipsis for cleaner display
   const getPageNumbers = () => {
+    if (totalRecords === 0 || safeTotalPages <= 0) return [];
     const pages = [];
-    if (totalPages <= 5) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    if (safeTotalPages <= 5) {
+      for (let i = 1; i <= safeTotalPages; i++) pages.push(i);
     } else {
-      if (currentPage <= 3) {
-        pages.push(1, 2, 3, 4, '...', totalPages);
-      } else if (currentPage >= totalPages - 2) {
-        pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      if (activePage <= 3) {
+        pages.push(1, 2, 3, 4, '...', safeTotalPages);
+      } else if (activePage >= safeTotalPages - 2) {
+        pages.push(1, '...', safeTotalPages - 3, safeTotalPages - 2, safeTotalPages - 1, safeTotalPages);
       } else {
-        pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+        pages.push(1, '...', activePage - 1, activePage, activePage + 1, '...', safeTotalPages);
       }
     }
     return pages;
+  };
+
+  const handleSizeChange = (e) => {
+    const newSize = Number(e.target.value);
+    if (!onPageSizeChange) return;
+    const newTotalPages = Math.ceil(totalRecords / newSize) || 1;
+    if (activePage > newTotalPages && onPageChange) {
+      onPageChange(1);
+    }
+    onPageSizeChange(newSize);
   };
 
   return (
@@ -62,7 +78,7 @@ export const DataTablePagination = ({
         }}
       >
         <span>
-          Showing <strong style={{ color: 'var(--text-main)' }}>{startRecord}</strong> to{' '}
+          Showing <strong style={{ color: 'var(--text-main)' }}>{displayStart}</strong> to{' '}
           <strong style={{ color: 'var(--text-main)' }}>{endRecord}</strong> of{' '}
           <strong style={{ color: 'var(--text-main)' }}>{totalRecords}</strong> records
         </span>
@@ -73,7 +89,7 @@ export const DataTablePagination = ({
             <select
               className="form-select"
               value={pageSize}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
+              onChange={handleSizeChange}
               style={{
                 width: 'auto',
                 padding: '4px 8px',
@@ -82,7 +98,7 @@ export const DataTablePagination = ({
                 borderColor: 'var(--border-light)',
               }}
             >
-              {pageSizeOptions.map((opt) => (
+              {options.map((opt) => (
                 <option key={opt} value={opt}>
                   {opt}
                 </option>
@@ -102,13 +118,13 @@ export const DataTablePagination = ({
       >
         <button
           type="button"
-          onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage <= 1}
+          onClick={() => onPageChange && onPageChange(activePage - 1)}
+          disabled={activePage <= 1 || totalRecords === 0}
           className="btn btn-outline btn-sm"
           style={{
             padding: '6px 10px',
-            opacity: currentPage <= 1 ? 0.4 : 1,
-            cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
+            opacity: activePage <= 1 || totalRecords === 0 ? 0.4 : 1,
+            cursor: activePage <= 1 || totalRecords === 0 ? 'not-allowed' : 'pointer',
           }}
           title="Previous Page"
         >
@@ -133,12 +149,12 @@ export const DataTablePagination = ({
                 </span>
               );
             }
-            const isActive = p === currentPage;
+            const isActive = p === activePage;
             return (
               <button
                 key={p}
                 type="button"
-                onClick={() => onPageChange(p)}
+                onClick={() => onPageChange && onPageChange(p)}
                 style={{
                   minWidth: '32px',
                   height: '32px',
@@ -161,13 +177,13 @@ export const DataTablePagination = ({
 
         <button
           type="button"
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage >= totalPages}
+          onClick={() => onPageChange && onPageChange(activePage + 1)}
+          disabled={activePage >= safeTotalPages || safeTotalPages <= 1 || totalRecords === 0}
           className="btn btn-outline btn-sm"
           style={{
             padding: '6px 10px',
-            opacity: currentPage >= totalPages ? 0.4 : 1,
-            cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
+            opacity: activePage >= safeTotalPages || safeTotalPages <= 1 || totalRecords === 0 ? 0.4 : 1,
+            cursor: activePage >= safeTotalPages || safeTotalPages <= 1 || totalRecords === 0 ? 'not-allowed' : 'pointer',
           }}
           title="Next Page"
         >

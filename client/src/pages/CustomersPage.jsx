@@ -23,8 +23,8 @@ import { formatDate } from '../utils/dateUtils';
 
 export const CustomersPage = () => {
   const [customers, setCustomers] = useState([]);
-  const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0, totalRecords: 0, totalPages: 1 });
-  const [pageSize, setPageSize] = useState(15);
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalRecords: 0, totalPages: 1 });
+  const [pageSize, setPageSize] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -63,7 +63,7 @@ export const CustomersPage = () => {
 
       setCustomers(res.data || []);
       const p = res.pagination || {};
-      const totalCount = p.total !== undefined ? p.total : (p.totalRecords || 0);
+      const totalCount = p.total !== undefined ? p.total : (p.totalRecords !== undefined ? p.totalRecords : (res.total || 0));
       const totalPages = p.totalPages !== undefined ? p.totalPages : (Math.ceil(totalCount / currentSize) || 0);
       setPagination({
         page: p.page || page,
@@ -88,10 +88,10 @@ export const CustomersPage = () => {
     }
   };
 
-  // Re-fetch on search, sort, or pageSize change (reset to page 1)
+  // Re-fetch on search or sort change (reset to page 1)
   useEffect(() => {
     fetchCustomers(1, pageSize);
-  }, [search, sortBy, pageSize]);
+  }, [search, sortBy]);
 
   const handlePageChange = (newPage) => {
     if (newPage === pagination.page || newPage < 1 || (pagination.totalPages > 0 && newPage > pagination.totalPages)) {
@@ -100,10 +100,14 @@ export const CustomersPage = () => {
     fetchCustomers(newPage, pageSize);
   };
 
-  // Only update pageSize state; the useEffect on pageSize will trigger the single required request
+  // When changing rows per page, reset to page 1 if the current page becomes invalid
   const handlePageSizeChange = (newSize) => {
     if (newSize === pageSize) return;
+    const totalCount = pagination.total || 0;
+    const newTotalPages = Math.ceil(totalCount / newSize) || 1;
+    const targetPage = pagination.page > newTotalPages ? 1 : pagination.page;
     setPageSize(newSize);
+    fetchCustomers(targetPage, newSize);
   };
 
   const handleResetFilters = () => {
@@ -301,21 +305,32 @@ export const CustomersPage = () => {
             <ErrorMessage message={error} onRetry={() => fetchCustomers(pagination.page)} />
           </div>
         ) : customers.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
-            <Users size={48} color="#94a3b8" style={{ margin: '0 auto 12px' }} />
-            <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>No customers found</div>
-            <p style={{ fontSize: '0.88rem', marginTop: '6px' }}>
-              {search ? `No customer matching "${search}".` : 'Get started by adding your first customer.'}
-            </p>
-            {hasActiveFilters ? (
-              <button onClick={handleResetFilters} className="btn btn-outline btn-sm" style={{ marginTop: '16px' }}>
-                Clear Filters
-              </button>
-            ) : (
-              <button onClick={handleOpenAdd} className="btn btn-primary" style={{ marginTop: '16px' }}>
-                <Plus size={16} /> Add New Customer
-              </button>
-            )}
+          <div>
+            <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+              <Users size={48} color="#94a3b8" style={{ margin: '0 auto 12px' }} />
+              <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>No customers found</div>
+              <p style={{ fontSize: '0.88rem', marginTop: '6px' }}>
+                {search ? `No customer matching "${search}".` : 'Get started by adding your first customer.'}
+              </p>
+              {hasActiveFilters ? (
+                <button onClick={handleResetFilters} className="btn btn-outline btn-sm" style={{ marginTop: '16px' }}>
+                  Clear Filters
+                </button>
+              ) : (
+                <button onClick={handleOpenAdd} className="btn btn-primary" style={{ marginTop: '16px' }}>
+                  <Plus size={16} /> Add New Customer
+                </button>
+              )}
+            </div>
+            <DataTablePagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              totalRecords={pagination.total}
+              pageSize={pageSize}
+              pageSizeOptions={[5, 10, 25, 50]}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
           </div>
         ) : (
           <div>
@@ -449,7 +464,7 @@ export const CustomersPage = () => {
               totalPages={pagination.totalPages}
               totalRecords={pagination.total}
               pageSize={pageSize}
-              pageSizeOptions={[10, 25, 50]}
+              pageSizeOptions={[5, 10, 25, 50]}
               onPageChange={handlePageChange}
               onPageSizeChange={handlePageSizeChange}
             />

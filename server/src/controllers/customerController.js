@@ -11,9 +11,9 @@ const normalizeMobile = (mobile) => {
 export const getCustomers = async (req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
-    const { search = '', sortBy = 'newest', page = 1, limit = 20, status = '' } = req.query;
-    const pageNum = Math.max(1, parseInt(page, 10));
-    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10)));
+    const { search = '', sortBy = 'newest', page = 1, limit = 10, status = '' } = req.query;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
     const skip = (pageNum - 1) * limitNum;
 
     // Strictly enforce tenant isolation, excluding archived/soft-deleted customers by default

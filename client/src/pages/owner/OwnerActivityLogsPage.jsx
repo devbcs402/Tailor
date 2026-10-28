@@ -27,7 +27,7 @@ export const OwnerActivityLogsPage = () => {
   // Filters & Pagination
   const [actionFilter, setActionFilter] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(15);
+  const [pageSize, setPageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
 
@@ -571,21 +571,22 @@ export const OwnerActivityLogsPage = () => {
         </div>
 
         {/* Pagination */}
-        {totalRecords > 0 && (
-          <div style={{ padding: '14px 20px', borderTop: '1px solid #e2e8f0' }}>
-            <DataTablePagination
-              page={page}
-              pageSize={pageSize}
-              totalPages={totalPages}
-              totalRecords={totalRecords}
-              onPageChange={(p) => setPage(p)}
-              onPageSizeChange={(s) => {
-                setPageSize(s);
-                setPage(1);
-              }}
-            />
-          </div>
-        )}
+        <div style={{ padding: '14px 20px', borderTop: '1px solid #e2e8f0' }}>
+          <DataTablePagination
+            currentPage={page}
+            pageSize={pageSize}
+            pageSizeOptions={[5, 10, 25, 50]}
+            totalPages={totalPages}
+            totalRecords={totalRecords}
+            onPageChange={(p) => setPage(p)}
+            onPageSizeChange={(newSize) => {
+              const newTotalPages = Math.ceil(totalRecords / newSize) || 1;
+              const targetPage = page > newTotalPages ? 1 : page;
+              setPageSize(newSize);
+              setPage(targetPage);
+            }}
+          />
+        </div>
       </div>
 
       {/* Confirmation Modal */}

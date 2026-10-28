@@ -22,6 +22,7 @@ import { useToast } from '../context/ToastContext';
 import { Loading } from '../components/common/Loading';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { SearchInput } from '../components/common/SearchInput';
+import { DataTablePagination } from '../components/common/DataTablePagination';
 import { notifyMeasurementsUpdated } from '../hooks/useTenantMeasurements';
 import { notifyPatternsUpdated } from '../hooks/useTenantPatterns';
 import { transliterateToGujarati, getGujaratiSuggestions } from '../utils/gujaratiTransliteration';
@@ -140,6 +141,21 @@ export const MeasurementSettingsPage = () => {
       d.fieldKey.toLowerCase().includes(q)
     );
   });
+
+  // Client-side pagination for measurement definitions
+  const [measPage, setMeasPage] = useState(1);
+  const [measPageSize, setMeasPageSize] = useState(10);
+
+  useEffect(() => {
+    setMeasPage(1);
+  }, [activeTab, searchQuery]);
+
+  const measTotalRecords = filteredDefinitions.length;
+  const measTotalPages = Math.ceil(measTotalRecords / measPageSize) || 1;
+  const measCurrentPage = Math.min(Math.max(1, measPage), measTotalPages);
+  const measStartIndex = (measCurrentPage - 1) * measPageSize;
+  const measEndIndex = measStartIndex + measPageSize;
+  const displayedDefinitions = filteredDefinitions.slice(measStartIndex, measEndIndex);
 
   // -----------------------------------------------------------------
   // Open Add Modal
@@ -428,6 +444,21 @@ export const MeasurementSettingsPage = () => {
     p.name.toLowerCase().includes(patternSearch.trim().toLowerCase())
   );
 
+  // Client-side pagination for patterns tab
+  const [patternPage, setPatternPage] = useState(1);
+  const [patternPageSize, setPatternPageSize] = useState(10);
+
+  useEffect(() => {
+    setPatternPage(1);
+  }, [patternTypeTab, patternSearch]);
+
+  const patternTotalRecords = filteredPatterns.length;
+  const patternTotalPages = Math.ceil(patternTotalRecords / patternPageSize) || 1;
+  const patternCurrentPage = Math.min(Math.max(1, patternPage), patternTotalPages);
+  const patternStartIndex = (patternCurrentPage - 1) * patternPageSize;
+  const patternEndIndex = patternStartIndex + patternPageSize;
+  const displayedPatterns = filteredPatterns.slice(patternStartIndex, patternEndIndex);
+
   return (
     <div style={{ maxWidth: '1180px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Top Action Bar with Back Link */}
@@ -630,7 +661,8 @@ export const MeasurementSettingsPage = () => {
           {loadingDefs ? (
             <Loading text="Loading measurement fields..." />
           ) : (
-            <div className="table-responsive">
+            <>
+              <div className="table-responsive">
               <table className="data-table">
                 <thead>
                   <tr>
@@ -652,7 +684,9 @@ export const MeasurementSettingsPage = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredDefinitions.map((def, idx) => (
+                    displayedDefinitions.map((def, idx) => {
+                      const globalIndex = currentDefinitions.findIndex((d) => d._id === def._id);
+                      return (
                       <tr
                         key={def._id}
                         style={{
@@ -664,19 +698,19 @@ export const MeasurementSettingsPage = () => {
                         <td style={{ textAlign: 'center' }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                             <span style={{ fontWeight: 700, fontSize: '0.9rem', minWidth: '18px' }}>
-                              {def.displayOrder || idx + 1}
+                              {def.displayOrder || (globalIndex >= 0 ? globalIndex + 1 : idx + 1)}
                             </span>
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                               <button
                                 type="button"
-                                disabled={idx === 0}
-                                onClick={() => handleMoveOrder(idx, 'up')}
+                                disabled={globalIndex <= 0}
+                                onClick={() => handleMoveOrder(globalIndex, 'up')}
                                 style={{
                                   background: 'none',
                                   border: 'none',
                                   padding: 0,
-                                  cursor: idx === 0 ? 'not-allowed' : 'pointer',
-                                  color: idx === 0 ? '#cbd5e1' : 'var(--primary)',
+                                  cursor: globalIndex <= 0 ? 'not-allowed' : 'pointer',
+                                  color: globalIndex <= 0 ? '#cbd5e1' : 'var(--primary)',
                                   lineHeight: 1,
                                 }}
                                 title="Move up"
@@ -685,14 +719,14 @@ export const MeasurementSettingsPage = () => {
                               </button>
                               <button
                                 type="button"
-                                disabled={idx === filteredDefinitions.length - 1}
-                                onClick={() => handleMoveOrder(idx, 'down')}
+                                disabled={globalIndex < 0 || globalIndex >= currentDefinitions.length - 1}
+                                onClick={() => handleMoveOrder(globalIndex, 'down')}
                                 style={{
                                   background: 'none',
                                   border: 'none',
                                   padding: 0,
-                                  cursor: idx === filteredDefinitions.length - 1 ? 'not-allowed' : 'pointer',
-                                  color: idx === filteredDefinitions.length - 1 ? '#cbd5e1' : 'var(--primary)',
+                                  cursor: globalIndex < 0 || globalIndex >= currentDefinitions.length - 1 ? 'not-allowed' : 'pointer',
+                                  color: globalIndex < 0 || globalIndex >= currentDefinitions.length - 1 ? '#cbd5e1' : 'var(--primary)',
                                   lineHeight: 1,
                                 }}
                                 title="Move down"
@@ -819,12 +853,30 @@ export const MeasurementSettingsPage = () => {
                           </div>
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>
             </div>
-          )}
+
+            <DataTablePagination
+              currentPage={measCurrentPage}
+              totalPages={measTotalPages}
+              totalRecords={measTotalRecords}
+              pageSize={measPageSize}
+              pageSizeOptions={[5, 10, 25, 50]}
+              onPageChange={(newPage) => setMeasPage(newPage)}
+              onPageSizeChange={(newSize) => {
+                const newTotalPages = Math.ceil(measTotalRecords / newSize) || 1;
+                if (measCurrentPage > newTotalPages) {
+                  setMeasPage(1);
+                }
+                setMeasPageSize(newSize);
+              }}
+            />
+          </>
+        )}
         </div>
       )}
 
@@ -907,7 +959,8 @@ export const MeasurementSettingsPage = () => {
           {loadingPatterns ? (
             <Loading text="Loading pattern options..." />
           ) : (
-            <div className="table-responsive">
+            <>
+              <div className="table-responsive">
               <table className="data-table">
                 <thead>
                   <tr>
@@ -924,7 +977,7 @@ export const MeasurementSettingsPage = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredPatterns.map((pat) => (
+                    displayedPatterns.map((pat) => (
                       <tr key={pat._id}>
                         <td>
                           {editingPatternId === pat._id ? (
@@ -1005,7 +1058,24 @@ export const MeasurementSettingsPage = () => {
                 </tbody>
               </table>
             </div>
-          )}
+
+            <DataTablePagination
+              currentPage={patternCurrentPage}
+              totalPages={patternTotalPages}
+              totalRecords={patternTotalRecords}
+              pageSize={patternPageSize}
+              pageSizeOptions={[5, 10, 25, 50]}
+              onPageChange={(newPage) => setPatternPage(newPage)}
+              onPageSizeChange={(newSize) => {
+                const newTotalPages = Math.ceil(patternTotalRecords / newSize) || 1;
+                if (patternCurrentPage > newTotalPages) {
+                  setPatternPage(1);
+                }
+                setPatternPageSize(newSize);
+              }}
+            />
+          </>
+        )}
         </div>
       )}
 

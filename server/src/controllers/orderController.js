@@ -143,11 +143,11 @@ export const getOrders = async (req, res, next) => {
       to = '',
       sortBy = 'newest',
       page = 1,
-      limit = 15,
+      limit = 10,
     } = req.query;
 
-    const pageNum = Math.max(1, parseInt(page, 10));
-    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10)));
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
     const skip = (pageNum - 1) * limitNum;
 
     const query = { tenantId };
